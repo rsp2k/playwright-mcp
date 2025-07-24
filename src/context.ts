@@ -34,6 +34,9 @@ export class Context {
   private _tabs: Tab[] = [];
   private _currentTab: Tab | undefined;
   clientVersion: { name: string; version: string; } | undefined;
+  private _videoRecordingConfig: { dir: string; size?: { width: number; height: number } } | undefined;
+  private _videoBaseFilename: string | undefined;
+  private _activePagesWithVideos: Set<playwright.Page> = new Set();
 
   private static _allContexts: Set<Context> = new Set();
   private _closeBrowserContextPromise: Promise<void> | undefined;
@@ -125,6 +128,11 @@ export class Context {
     this._tabs.push(tab);
     if (!this._currentTab)
       this._currentTab = tab;
+
+    // Track pages with video recording
+    if (this._videoRecordingConfig && page.video())
+      this._activePagesWithVideos.add(page);
+
   }
 
   private _onPageClosed(tab: Tab) {
@@ -194,8 +202,16 @@ export class Context {
   private async _setupBrowserContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
     if (this._closeBrowserContextPromise)
       throw new Error('Another browser context is being closed.');
-    // TODO: move to the browser context factory to make it based on isolation mode.
-    const result = await this._browserContextFactory.createContext(this.clientVersion!);
+    
+    let result: { browserContext: playwright.BrowserContext, close: () => Promise<void> };
+    
+    if (this._videoRecordingConfig) {
+      // Create a new browser context with video recording enabled
+      result = await this._createVideoEnabledContext();
+    } else {
+      // Use the standard browser context factory
+      result = await this._browserContextFactory.createContext(this.clientVersion!);
+    }
     const { browserContext } = result;
     await this._setupRequestInterception(browserContext);
     for (const page of browserContext.pages())
@@ -210,5 +226,82 @@ export class Context {
       });
     }
     return result;
+  }
+
+  private async _createVideoEnabledContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
+    // For video recording, we need to create an isolated context
+    const browserType = playwright[this.config.browser.browserName];
+
+    const browser = await browserType.launch({
+      ...this.config.browser.launchOptions,
+      handleSIGINT: false,
+      handleSIGTERM: false,
+    });
+
+    const contextOptions = {
+      ...this.config.browser.contextOptions,
+      recordVideo: this._videoRecordingConfig,
+    };
+
+    const browserContext = await browser.newContext(contextOptions);
+
+    return {
+      browserContext,
+      close: async () => {
+        await browserContext.close();
+        await browser.close();
+      }
+    };
+  }
+
+  setVideoRecording(config: { dir: string; size?: { width: number; height: number } }, baseFilename: string) {
+    this._videoRecordingConfig = config;
+    this._videoBaseFilename = baseFilename;
+
+    // Force recreation of browser context to include video recording
+    if (this._browserContextPromise) {
+      void this.close().then(() => {
+        // The next call to _ensureBrowserContext will create a new context with video recording
+      });
+    }
+  }
+
+  getVideoRecordingInfo() {
+    return {
+      enabled: !!this._videoRecordingConfig,
+      config: this._videoRecordingConfig,
+      baseFilename: this._videoBaseFilename,
+      activeRecordings: this._activePagesWithVideos.size,
+    };
+  }
+
+  async stopVideoRecording(): Promise<string[]> {
+    if (!this._videoRecordingConfig)
+      return [];
+
+
+    const videoPaths: string[] = [];
+
+    // Close all pages to save videos
+    for (const page of this._activePagesWithVideos) {
+      try {
+        if (!page.isClosed()) {
+          await page.close();
+          const video = page.video();
+          if (video) {
+            const videoPath = await video.path();
+            videoPaths.push(videoPath);
+          }
+        }
+      } catch (error) {
+        testDebug('Error closing page for video recording:', error);
+      }
+    }
+
+    this._activePagesWithVideos.clear();
+    this._videoRecordingConfig = undefined;
+    this._videoBaseFilename = undefined;
+
+    return videoPaths;
   }
 }
