@@ -15,6 +15,7 @@
  */
 
 import common from './tools/common.js';
+import configure from './tools/configure.js';
 import console from './tools/console.js';
 import dialogs from './tools/dialogs.js';
 import evaluate from './tools/evaluate.js';
@@ -36,6 +37,7 @@ import type { FullConfig } from './config.js';
 
 export const allTools: Tool<any>[] = [
   ...common,
+  ...configure,
   ...console,
   ...dialogs,
   ...evaluate,

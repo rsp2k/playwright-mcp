@@ -129,8 +129,10 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
   const launchOptions: LaunchOptions = {
     channel,
     executablePath: cliOptions.executablePath,
-    headless: cliOptions.headless,
   };
+  if (cliOptions.headless !== undefined) {
+    launchOptions.headless = cliOptions.headless;
+  }
 
   // --no-sandbox was passed, disable the sandbox
   if (cliOptions.sandbox === false)

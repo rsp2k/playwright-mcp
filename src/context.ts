@@ -19,6 +19,7 @@ import * as playwright from 'playwright';
 
 import { logUnhandledError } from './log.js';
 import { Tab } from './tab.js';
+import { EnvironmentIntrospector } from './environmentIntrospection.js';
 
 import type { Tool } from './tools/tool.js';
 import type { FullConfig } from './config.js';
@@ -37,20 +38,53 @@ export class Context {
   private _videoRecordingConfig: { dir: string; size?: { width: number; height: number } } | undefined;
   private _videoBaseFilename: string | undefined;
   private _activePagesWithVideos: Set<playwright.Page> = new Set();
+  private _environmentIntrospector: EnvironmentIntrospector;
 
   private static _allContexts: Set<Context> = new Set();
   private _closeBrowserContextPromise: Promise<void> | undefined;
 
-  constructor(tools: Tool[], config: FullConfig, browserContextFactory: BrowserContextFactory) {
+  // Session isolation properties
+  readonly sessionId: string;
+  private _sessionStartTime: number;
+
+  constructor(tools: Tool[], config: FullConfig, browserContextFactory: BrowserContextFactory, environmentIntrospector?: EnvironmentIntrospector) {
     this.tools = tools;
     this.config = config;
     this._browserContextFactory = browserContextFactory;
-    testDebug('create context');
+    this._environmentIntrospector = environmentIntrospector || new EnvironmentIntrospector();
+
+    // Generate unique session ID
+    this._sessionStartTime = Date.now();
+    this.sessionId = this._generateSessionId();
+
+    testDebug(`create context with sessionId: ${this.sessionId}`);
     Context._allContexts.add(this);
   }
 
   static async disposeAll() {
     await Promise.all([...Context._allContexts].map(context => context.dispose()));
+  }
+
+  private _generateSessionId(): string {
+    // Create a base session ID from timestamp and random
+    const baseId = `${this._sessionStartTime}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // If we have client version info, incorporate it
+    if (this.clientVersion) {
+      const clientInfo = `${this.clientVersion.name || 'unknown'}-${this.clientVersion.version || 'unknown'}`;
+      return `${clientInfo}-${baseId}`;
+    }
+
+    return baseId;
+  }
+
+  updateSessionIdWithClientInfo() {
+    if (this.clientVersion) {
+      const newSessionId = this._generateSessionId();
+      testDebug(`updating sessionId from ${this.sessionId} to ${newSessionId}`);
+      // Note: sessionId is readonly, but we can update it during initialization
+      (this as any).sessionId = newSessionId;
+    }
   }
 
   tabs(): Tab[] {
@@ -202,15 +236,15 @@ export class Context {
   private async _setupBrowserContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
     if (this._closeBrowserContextPromise)
       throw new Error('Another browser context is being closed.');
-    
+
     let result: { browserContext: playwright.BrowserContext, close: () => Promise<void> };
-    
+
     if (this._videoRecordingConfig) {
       // Create a new browser context with video recording enabled
       result = await this._createVideoEnabledContext();
     } else {
-      // Use the standard browser context factory
-      result = await this._browserContextFactory.createContext(this.clientVersion!);
+      // Use session-aware browser context factory
+      result = await this._createSessionIsolatedContext();
     }
     const { browserContext } = result;
     await this._setupRequestInterception(browserContext);
@@ -232,15 +266,26 @@ export class Context {
     // For video recording, we need to create an isolated context
     const browserType = playwright[this.config.browser.browserName];
 
+    // Get environment-specific browser options
+    const envOptions = this._environmentIntrospector.getRecommendedBrowserOptions();
+
     const browser = await browserType.launch({
       ...this.config.browser.launchOptions,
+      ...envOptions, // Include environment-detected options
       handleSIGINT: false,
       handleSIGTERM: false,
     });
 
+    // Use environment-specific video directory if available
+    const videoConfig = envOptions.recordVideo ?
+      { ...this._videoRecordingConfig, dir: envOptions.recordVideo.dir } :
+      this._videoRecordingConfig;
+
     const contextOptions = {
       ...this.config.browser.contextOptions,
-      recordVideo: this._videoRecordingConfig,
+      recordVideo: videoConfig,
+      // Force isolated session for video recording with session-specific storage
+      storageState: undefined, // Always start fresh for video recording
     };
 
     const browserContext = await browser.newContext(contextOptions);
@@ -254,13 +299,49 @@ export class Context {
     };
   }
 
+  private async _createSessionIsolatedContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
+    // Always create isolated browser contexts for each MCP client
+    // This ensures complete session isolation between different clients
+    const browserType = playwright[this.config.browser.browserName];
+
+    // Get environment-specific browser options
+    const envOptions = this._environmentIntrospector.getRecommendedBrowserOptions();
+
+    const browser = await browserType.launch({
+      ...this.config.browser.launchOptions,
+      ...envOptions, // Include environment-detected options
+      handleSIGINT: false,
+      handleSIGTERM: false,
+    });
+
+    // Create isolated context options with session-specific storage
+    const contextOptions = {
+      ...this.config.browser.contextOptions,
+      // Each session gets its own isolated storage - no shared state
+      storageState: undefined,
+    };
+
+    const browserContext = await browser.newContext(contextOptions);
+
+    testDebug(`created isolated browser context for session: ${this.sessionId}`);
+
+    return {
+      browserContext,
+      close: async () => {
+        testDebug(`closing isolated browser context for session: ${this.sessionId}`);
+        await browserContext.close();
+        await browser.close();
+      }
+    };
+  }
+
   setVideoRecording(config: { dir: string; size?: { width: number; height: number } }, baseFilename: string) {
     this._videoRecordingConfig = config;
     this._videoBaseFilename = baseFilename;
 
     // Force recreation of browser context to include video recording
     if (this._browserContextPromise) {
-      void this.close().then(() => {
+      void this.closeBrowserContext().then(() => {
         // The next call to _ensureBrowserContext will create a new context with video recording
       });
     }
@@ -273,6 +354,55 @@ export class Context {
       baseFilename: this._videoBaseFilename,
       activeRecordings: this._activePagesWithVideos.size,
     };
+  }
+
+  updateEnvironmentRoots(roots: { uri: string; name?: string }[]) {
+    this._environmentIntrospector.updateRoots(roots);
+
+    // Log environment change
+    const summary = this._environmentIntrospector.getEnvironmentSummary();
+    testDebug(`environment updated for session ${this.sessionId}: ${summary}`);
+
+    // If we have an active browser context, we might want to recreate it
+    // For now, we'll just log the change - full recreation would close existing tabs
+    if (this._browserContextPromise)
+      testDebug(`browser context exists - environment changes will apply to new contexts`);
+
+  }
+
+  getEnvironmentIntrospector(): EnvironmentIntrospector {
+    return this._environmentIntrospector;
+  }
+
+  async updateBrowserConfig(changes: {
+    headless?: boolean;
+    viewport?: { width: number; height: number };
+    userAgent?: string;
+  }): Promise<void> {
+    const currentConfig = { ...this.config };
+    
+    // Update the configuration
+    if (changes.headless !== undefined) {
+      currentConfig.browser.launchOptions.headless = changes.headless;
+    }
+    if (changes.viewport) {
+      currentConfig.browser.contextOptions.viewport = changes.viewport;
+    }
+    if (changes.userAgent) {
+      currentConfig.browser.contextOptions.userAgent = changes.userAgent;
+    }
+
+    // Store the modified config
+    (this as any).config = currentConfig;
+
+    // Close the current browser context to force recreation with new settings
+    await this.closeBrowserContext();
+    
+    // Clear tabs since they're attached to the old context
+    this._tabs = [];
+    this._currentTab = undefined;
+    
+    testDebug(`browser config updated for session ${this.sessionId}: headless=${currentConfig.browser.launchOptions.headless}, viewport=${JSON.stringify(currentConfig.browser.contextOptions.viewport)}`);
   }
 
   async stopVideoRecording(): Promise<string[]> {
