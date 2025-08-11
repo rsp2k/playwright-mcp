@@ -55,7 +55,7 @@ const defaultConfig: FullConfig = {
     browserName: 'chromium',
     launchOptions: {
       channel: 'chrome',
-      headless: os.platform() === 'linux' && !process.env.DISPLAY,
+      headless: false,
       chromiumSandbox: true,
     },
     contextOptions: {
