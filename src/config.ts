@@ -53,6 +53,7 @@ export type CLIOptions = {
 const defaultConfig: FullConfig = {
   browser: {
     browserName: 'chromium',
+    isolated: true,
     launchOptions: {
       channel: 'chrome',
       headless: false,
