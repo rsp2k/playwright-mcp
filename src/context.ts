@@ -236,7 +236,6 @@ export class Context {
   private async _setupBrowserContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
     if (this._closeBrowserContextPromise)
       throw new Error('Another browser context is being closed.');
-
     let result: { browserContext: playwright.BrowserContext, close: () => Promise<void> };
 
     if (this._videoRecordingConfig) {
