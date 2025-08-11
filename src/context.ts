@@ -16,6 +16,7 @@
 
 import debug from 'debug';
 import * as playwright from 'playwright';
+import { devices } from 'playwright';
 
 import { logUnhandledError } from './log.js';
 import { Tab } from './tab.js';
@@ -341,6 +342,12 @@ export class Context {
     headless?: boolean;
     viewport?: { width: number; height: number };
     userAgent?: string;
+    device?: string;
+    geolocation?: { latitude: number; longitude: number; accuracy?: number };
+    locale?: string;
+    timezone?: string;
+    colorScheme?: 'light' | 'dark' | 'no-preference';
+    permissions?: string[];
   }): Promise<void> {
     const currentConfig = { ...this.config };
     
@@ -348,11 +355,52 @@ export class Context {
     if (changes.headless !== undefined) {
       currentConfig.browser.launchOptions.headless = changes.headless;
     }
-    if (changes.viewport) {
-      currentConfig.browser.contextOptions.viewport = changes.viewport;
+    
+    // Handle device emulation - this overrides individual viewport/userAgent settings
+    if (changes.device) {
+      if (!devices[changes.device]) {
+        throw new Error(`Unknown device: ${changes.device}`);
+      }
+      const deviceConfig = devices[changes.device];
+      
+      // Apply all device properties to context options
+      currentConfig.browser.contextOptions = {
+        ...currentConfig.browser.contextOptions,
+        ...deviceConfig,
+      };
+    } else {
+      // Apply individual settings only if no device is specified
+      if (changes.viewport) {
+        currentConfig.browser.contextOptions.viewport = changes.viewport;
+      }
+      if (changes.userAgent) {
+        currentConfig.browser.contextOptions.userAgent = changes.userAgent;
+      }
     }
-    if (changes.userAgent) {
-      currentConfig.browser.contextOptions.userAgent = changes.userAgent;
+
+    // Apply additional context options
+    if (changes.geolocation) {
+      currentConfig.browser.contextOptions.geolocation = {
+        latitude: changes.geolocation.latitude,
+        longitude: changes.geolocation.longitude,
+        accuracy: changes.geolocation.accuracy || 100
+      };
+    }
+    
+    if (changes.locale) {
+      currentConfig.browser.contextOptions.locale = changes.locale;
+    }
+    
+    if (changes.timezone) {
+      currentConfig.browser.contextOptions.timezoneId = changes.timezone;
+    }
+    
+    if (changes.colorScheme) {
+      currentConfig.browser.contextOptions.colorScheme = changes.colorScheme;
+    }
+    
+    if (changes.permissions) {
+      currentConfig.browser.contextOptions.permissions = changes.permissions;
     }
 
     // Store the modified config
