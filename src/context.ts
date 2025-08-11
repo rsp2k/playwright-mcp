@@ -243,8 +243,8 @@ export class Context {
       // Create a new browser context with video recording enabled
       result = await this._createVideoEnabledContext();
     } else {
-      // Use session-aware browser context factory
-      result = await this._createSessionIsolatedContext();
+      // Use the standard browser context factory
+      result = await this._browserContextFactory.createContext(this.clientVersion!);
     }
     const { browserContext } = result;
     await this._setupRequestInterception(browserContext);
@@ -293,42 +293,6 @@ export class Context {
     return {
       browserContext,
       close: async () => {
-        await browserContext.close();
-        await browser.close();
-      }
-    };
-  }
-
-  private async _createSessionIsolatedContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
-    // Always create isolated browser contexts for each MCP client
-    // This ensures complete session isolation between different clients
-    const browserType = playwright[this.config.browser.browserName];
-
-    // Get environment-specific browser options
-    const envOptions = this._environmentIntrospector.getRecommendedBrowserOptions();
-
-    const browser = await browserType.launch({
-      ...this.config.browser.launchOptions,
-      ...envOptions, // Include environment-detected options
-      handleSIGINT: false,
-      handleSIGTERM: false,
-    });
-
-    // Create isolated context options with session-specific storage
-    const contextOptions = {
-      ...this.config.browser.contextOptions,
-      // Each session gets its own isolated storage - no shared state
-      storageState: undefined,
-    };
-
-    const browserContext = await browser.newContext(contextOptions);
-
-    testDebug(`created isolated browser context for session: ${this.sessionId}`);
-
-    return {
-      browserContext,
-      close: async () => {
-        testDebug(`closing isolated browser context for session: ${this.sessionId}`);
         await browserContext.close();
         await browser.close();
       }
