@@ -45,6 +45,9 @@ export interface ServerBackend {
   initialize?(): Promise<void>;
   tools(): ToolSchema<any>[];
   callTool(schema: ToolSchema<any>, parsedArguments: any): Promise<ToolResponse>;
+  listRoots?(): Promise<{ uri: string; name?: string }[]>;
+  rootsListChanged?(): Promise<void>;
+  setSessionId?(sessionId: string): void;
   serverInitialized?(version: ClientVersion | undefined): void;
   serverClosed?(): void;
 }
