@@ -144,6 +144,8 @@ Playwright MCP server supports following arguments. They can be provided in the 
 > npx @playwright/mcp@latest --help
   --allowed-origins <origins>  semicolon-separated list of origins to allow the
                                browser to request. Default is to allow all.
+  --artifact-dir <path>        path to the directory for centralized artifact
+                               storage with session-specific subdirectories.
   --blocked-origins <origins>  semicolon-separated list of origins to block the
                                browser from requesting. Blocklist is evaluated
                                before allowlist. If used without the allowlist,
@@ -296,6 +298,9 @@ npx @playwright/mcp@latest --config path/to/config.json
   // Directory for output files
   outputDir?: string;
 
+  // Directory for centralized artifact storage with session-specific subdirectories
+  artifactDir?: string;
+
   // Network configuration
   network?: {
     // List of origins to allow the browser to request. Default is to allow all. Origins matching both `allowedOrigins` and `blockedOrigins` will be blocked.
@@ -313,6 +318,125 @@ npx @playwright/mcp@latest --config path/to/config.json
 }
 ```
 </details>
+
+### Centralized Artifact Storage
+
+The Playwright MCP server supports centralized artifact storage for organizing all generated files (screenshots, videos, and PDFs) in session-specific directories with comprehensive logging.
+
+#### Configuration
+
+**Command Line Option:**
+```bash
+npx @playwright/mcp@latest --artifact-dir /path/to/artifacts
+```
+
+**Environment Variable:**
+```bash
+export PLAYWRIGHT_MCP_ARTIFACT_DIR="/path/to/artifacts"
+npx @playwright/mcp@latest
+```
+
+**MCP Client Configuration:**
+```js
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--artifact-dir",
+        "./browser-artifacts"
+      ]
+    }
+  }
+}
+```
+
+#### Features
+
+When artifact storage is enabled, the server provides:
+
+- **Session Isolation**: Each MCP session gets its own subdirectory
+- **Organized Storage**: All artifacts saved to `{artifact-dir}/{session-id}/`
+- **Tool Call Logging**: Complete audit trail in `tool-calls.json`
+- **Automatic Organization**: Videos saved to `videos/` subdirectory
+
+#### Directory Structure
+
+```
+browser-artifacts/
+└── mcp-session-abc123/
+    ├── tool-calls.json              # Complete log of all tool calls
+    ├── page-2024-01-15T10-30-00.png # Screenshots
+    ├── document.pdf                 # Generated PDFs
+    └── videos/
+        └── session-recording.webm   # Video recordings
+```
+
+#### Tool Call Log Format
+
+The `tool-calls.json` file contains detailed information about each operation:
+
+```json
+[
+  {
+    "timestamp": "2024-01-15T10:30:00.000Z",
+    "toolName": "browser_take_screenshot",
+    "parameters": {
+      "filename": "login-page.png"
+    },
+    "result": "success",
+    "artifactPath": "login-page.png"
+  },
+  {
+    "timestamp": "2024-01-15T10:31:15.000Z", 
+    "toolName": "browser_start_recording",
+    "parameters": {
+      "filename": "user-journey"
+    },
+    "result": "success"
+  }
+]
+```
+
+#### Per-Session Control
+
+You can dynamically enable, disable, or configure artifact storage during a session using the `browser_configure_artifacts` tool:
+
+**Check Current Status:**
+```
+browser_configure_artifacts
+```
+
+**Enable Artifact Storage:**
+```json
+{
+  "enabled": true,
+  "directory": "./my-artifacts"
+}
+```
+
+**Disable Artifact Storage:**
+```json
+{
+  "enabled": false
+}
+```
+
+**Custom Session ID:**
+```json
+{
+  "enabled": true,
+  "sessionId": "my-custom-session"
+}
+```
+
+#### Compatibility
+
+- **Backward Compatible**: When `--artifact-dir` is not specified, all tools work exactly as before
+- **Dynamic Control**: Artifact storage can be enabled/disabled per session without server restart
+- **Fallback Behavior**: If artifact storage fails, tools fall back to default output directory
+- **No Breaking Changes**: Existing configurations continue to work unchanged
 
 ### Standalone MCP server
 
@@ -409,6 +533,34 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_configure**
+  - Title: Configure browser settings
+  - Description: Change browser configuration settings like headless/headed mode, viewport size, user agent, device emulation, geolocation, locale, timezone, color scheme, or permissions for subsequent operations. This will close the current browser and restart it with new settings.
+  - Parameters:
+    - `headless` (boolean, optional): Whether to run the browser in headless mode
+    - `viewport` (object, optional): Browser viewport size
+    - `userAgent` (string, optional): User agent string for the browser
+    - `device` (string, optional): Device to emulate (e.g., "iPhone 13", "iPad", "Pixel 5"). Use browser_list_devices to see available devices.
+    - `geolocation` (object, optional): Set geolocation coordinates
+    - `locale` (string, optional): Browser locale (e.g., "en-US", "fr-FR", "ja-JP")
+    - `timezone` (string, optional): Timezone ID (e.g., "America/New_York", "Europe/London", "Asia/Tokyo")
+    - `colorScheme` (string, optional): Preferred color scheme
+    - `permissions` (array, optional): Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_configure_artifacts**
+  - Title: Configure artifact storage
+  - Description: Enable, disable, or configure centralized artifact storage for screenshots, videos, and PDFs during this session. Allows dynamic control over where artifacts are saved and how they are organized.
+  - Parameters:
+    - `enabled` (boolean, optional): Enable or disable centralized artifact storage for this session
+    - `directory` (string, optional): Directory path for artifact storage (if different from server default)
+    - `sessionId` (string, optional): Custom session ID for artifact organization (auto-generated if not provided)
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_console_messages**
   - Title: Get console messages
   - Description: Returns all console messages
@@ -465,6 +617,14 @@ http.createServer(async (req, res) => {
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_list_devices**
+  - Title: List available devices for emulation
+  - Description: Get a list of all available device emulation profiles including mobile phones, tablets, and desktop browsers. Each device includes viewport, user agent, and capabilities information.
+  - Parameters: None
   - Read-only: **true**
 
 <!-- NOTE: This has been generated via update-readme.js -->

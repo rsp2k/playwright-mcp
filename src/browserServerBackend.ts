@@ -23,6 +23,7 @@ import { filteredTools } from './tools.js';
 import { packageJSON } from './package.js';
 import { SessionManager } from './sessionManager.js';
 import { EnvironmentIntrospector } from './environmentIntrospection.js';
+import { ArtifactManagerRegistry } from './artifactManager.js';
 
 import type { BrowserContextFactory } from './browserContextFactory.js';
 import type * as mcpServer from './mcp/server.js';
@@ -45,7 +46,13 @@ export class BrowserServerBackend implements ServerBackend {
     this._config = config;
     this._browserContextFactory = browserContextFactory;
     this._environmentIntrospector = new EnvironmentIntrospector();
-    
+
+    // Initialize artifact manager registry if artifact directory is configured
+    if (config.artifactDir) {
+      const registry = ArtifactManagerRegistry.getInstance();
+      registry.setBaseDir(config.artifactDir);
+    }
+
     // Create a default context - will be replaced when session ID is set
     this._context = new Context(this._tools, config, browserContextFactory, this._environmentIntrospector);
   }
@@ -55,21 +62,21 @@ export class BrowserServerBackend implements ServerBackend {
   }
 
   setSessionId(sessionId: string): void {
-    if (this._sessionId === sessionId) {
+    if (this._sessionId === sessionId)
       return; // Already using this session
-    }
+
 
     this._sessionId = sessionId;
-    
+
     // Get or create persistent context for this session
     const sessionManager = SessionManager.getInstance();
     this._context = sessionManager.getOrCreateContext(
-      sessionId,
-      this._tools,
-      this._config,
-      this._browserContextFactory
+        sessionId,
+        this._tools,
+        this._config,
+        this._browserContextFactory
     );
-    
+
     // Update environment introspector reference
     this._environmentIntrospector = this._context.getEnvironmentIntrospector();
   }
@@ -81,7 +88,43 @@ export class BrowserServerBackend implements ServerBackend {
   async callTool(schema: mcpServer.ToolSchema<any>, parsedArguments: any) {
     const response = new Response(this._context, schema.name, parsedArguments);
     const tool = this._tools.find(tool => tool.schema.name === schema.name)!;
-    await tool.handle(this._context, parsedArguments, response);
+
+    let toolResult: 'success' | 'error' = 'success';
+    let errorMessage: string | undefined;
+    let artifactPath: string | undefined;
+
+    try {
+      await tool.handle(this._context, parsedArguments, response);
+
+      // Check if this tool created any artifacts
+      const serialized = await response.serialize();
+      if (serialized.content) {
+        // Look for file paths in the response
+        for (const content of serialized.content) {
+          if (content.type === 'text' && content.text) {
+            // Simple heuristic to find file paths
+            const pathMatches = content.text.match(/(?:saved to|created at|file:|path:)\s*([^\s\n]+\.(png|jpg|jpeg|webm|mp4|pdf))/gi);
+            if (pathMatches) {
+              artifactPath = pathMatches[0].split(/\s+/).pop();
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      toolResult = 'error';
+      errorMessage = String(error);
+    }
+
+    // Log the tool call if artifact manager is available
+    if (this._sessionId) {
+      const registry = ArtifactManagerRegistry.getInstance();
+      const artifactManager = registry.getManager(this._sessionId);
+      if (artifactManager)
+        artifactManager.logToolCall(schema.name, parsedArguments, toolResult, artifactPath, errorMessage);
+
+    }
+
     if (this._sessionLog)
       await this._sessionLog.log(response);
     return await response.serialize();
@@ -114,21 +157,21 @@ export class BrowserServerBackend implements ServerBackend {
     // For now, we can't directly access the client's exposed roots
     // This would need MCP SDK enhancement to get the current roots list
     // Client roots changed - environment capabilities may have updated
-    
+
     // In a full implementation, we would:
     // 1. Get the updated roots list from the MCP client
-    // 2. Update our environment introspector  
+    // 2. Update our environment introspector
     // 3. Reconfigure browser contexts if needed
-    
+
     // For demonstration, we'll simulate some common root updates
     // In practice, this would come from the MCP client
-    
+
     // Example: Update context with hypothetical root changes
     // this._context.updateEnvironmentRoots([
     //   { uri: 'file:///tmp/.X11-unix', name: 'X11 Sockets' },
     //   { uri: 'file:///home/user/project', name: 'Project Directory' }
     // ]);
-    
+
     // const summary = this._environmentIntrospector.getEnvironmentSummary();
     // Current environment would be logged here if needed
   }

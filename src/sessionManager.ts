@@ -31,9 +31,9 @@ export class SessionManager {
   private _sessions: Map<string, Context> = new Map();
 
   static getInstance(): SessionManager {
-    if (!SessionManager._instance) {
+    if (!SessionManager._instance)
       SessionManager._instance = new SessionManager();
-    }
+
     return SessionManager._instance;
   }
 

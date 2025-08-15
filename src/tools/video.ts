@@ -17,6 +17,7 @@
 import path from 'path';
 import { z } from 'zod';
 import { defineTool } from './tool.js';
+import { ArtifactManagerRegistry } from '../artifactManager.js';
 
 const startRecording = defineTool({
   capability: 'core',
@@ -38,7 +39,17 @@ const startRecording = defineTool({
   handle: async (context, params, response) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const baseFilename = params.filename || `session-${timestamp}`;
-    const videoDir = path.join(context.config.outputDir, 'videos');
+
+    // Use centralized artifact storage if configured
+    let videoDir: string;
+    const registry = ArtifactManagerRegistry.getInstance();
+    const artifactManager = context.sessionId ? registry.getManager(context.sessionId) : undefined;
+
+    if (artifactManager)
+      videoDir = artifactManager.getSubdirectory('videos');
+    else
+      videoDir = path.join(context.config.outputDir, 'videos');
+
 
     // Update context options to enable video recording
     const recordVideoOptions: any = {

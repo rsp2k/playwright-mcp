@@ -19,6 +19,7 @@ import { defineTabTool } from './tool.js';
 
 import * as javascript from '../javascript.js';
 import { outputFile } from '../config.js';
+import { ArtifactManagerRegistry } from '../artifactManager.js';
 
 const pdfSchema = z.object({
   filename: z.string().optional().describe('File name to save the pdf to. Defaults to `page-{timestamp}.pdf` if not specified.'),
@@ -36,7 +37,18 @@ const pdf = defineTabTool({
   },
 
   handle: async (tab, params, response) => {
-    const fileName = await outputFile(tab.context.config, params.filename ?? `page-${new Date().toISOString()}.pdf`);
+    // Use centralized artifact storage if configured
+    let fileName: string;
+    const registry = ArtifactManagerRegistry.getInstance();
+    const artifactManager = tab.context.sessionId ? registry.getManager(tab.context.sessionId) : undefined;
+
+    if (artifactManager) {
+      const defaultName = params.filename ?? `page-${new Date().toISOString()}.pdf`;
+      fileName = artifactManager.getArtifactPath(defaultName);
+    } else {
+      fileName = await outputFile(tab.context.config, params.filename ?? `page-${new Date().toISOString()}.pdf`);
+    }
+
     response.addCode(`// Save page as ${fileName}`);
     response.addCode(`await page.pdf(${javascript.formatObject({ path: fileName })});`);
     response.addResult(`Saved page as ${fileName}`);

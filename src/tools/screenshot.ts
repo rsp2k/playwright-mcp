@@ -20,6 +20,7 @@ import { defineTabTool } from './tool.js';
 import * as javascript from '../javascript.js';
 import { outputFile } from '../config.js';
 import { generateLocator } from './utils.js';
+import { ArtifactManagerRegistry } from '../artifactManager.js';
 
 import type * as playwright from 'playwright';
 
@@ -53,7 +54,19 @@ const screenshot = defineTabTool({
 
   handle: async (tab, params, response) => {
     const fileType = params.raw ? 'png' : 'jpeg';
-    const fileName = await outputFile(tab.context.config, params.filename ?? `page-${new Date().toISOString()}.${fileType}`);
+
+    // Use centralized artifact storage if configured
+    let fileName: string;
+    const registry = ArtifactManagerRegistry.getInstance();
+    const artifactManager = tab.context.sessionId ? registry.getManager(tab.context.sessionId) : undefined;
+
+    if (artifactManager) {
+      const defaultName = params.filename ?? `page-${new Date().toISOString()}.${fileType}`;
+      fileName = artifactManager.getArtifactPath(defaultName);
+    } else {
+      fileName = await outputFile(tab.context.config, params.filename ?? `page-${new Date().toISOString()}.${fileType}`);
+    }
+
     const options: playwright.PageScreenshotOptions = {
       type: fileType,
       quality: fileType === 'png' ? undefined : 50,

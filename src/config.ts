@@ -24,6 +24,7 @@ import type { BrowserContextOptions, LaunchOptions } from 'playwright';
 
 export type CLIOptions = {
   allowedOrigins?: string[];
+  artifactDir?: string;
   blockedOrigins?: string[];
   blockServiceWorkers?: boolean;
   browser?: string;
@@ -81,6 +82,7 @@ export type FullConfig = Config & {
   },
   network: NonNullable<Config['network']>,
   outputDir: string;
+  artifactDir?: string;
   server: NonNullable<Config['server']>,
 };
 
@@ -131,9 +133,9 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
     channel,
     executablePath: cliOptions.executablePath,
   };
-  if (cliOptions.headless !== undefined) {
+  if (cliOptions.headless !== undefined)
     launchOptions.headless = cliOptions.headless;
-  }
+
 
   // --no-sandbox was passed, disable the sandbox
   if (cliOptions.sandbox === false)
@@ -196,6 +198,7 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
     saveSession: cliOptions.saveSession,
     saveTrace: cliOptions.saveTrace,
     outputDir: cliOptions.outputDir,
+    artifactDir: cliOptions.artifactDir,
     imageResponses: cliOptions.imageResponses,
   };
 
@@ -205,6 +208,7 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
 function configFromEnv(): Config {
   const options: CLIOptions = {};
   options.allowedOrigins = semicolonSeparatedList(process.env.PLAYWRIGHT_MCP_ALLOWED_ORIGINS);
+  options.artifactDir = envToString(process.env.PLAYWRIGHT_MCP_ARTIFACT_DIR);
   options.blockedOrigins = semicolonSeparatedList(process.env.PLAYWRIGHT_MCP_BLOCKED_ORIGINS);
   options.blockServiceWorkers = envToBoolean(process.env.PLAYWRIGHT_MCP_BLOCK_SERVICE_WORKERS);
   options.browser = envToString(process.env.PLAYWRIGHT_MCP_BROWSER);

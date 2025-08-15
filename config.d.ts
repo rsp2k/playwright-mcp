@@ -100,6 +100,12 @@ export type Config = {
    */
   outputDir?: string;
 
+  /**
+   * The directory to save all screenshots and videos with session-specific subdirectories.
+   * When set, all artifacts will be saved to {artifactDir}/{sessionId}/ with tool call logs.
+   */
+  artifactDir?: string;
+
   network?: {
     /**
      * List of origins to allow the browser to request. Default is to allow all. Origins matching both `allowedOrigins` and `blockedOrigins` will be blocked.

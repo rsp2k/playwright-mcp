@@ -31,6 +31,7 @@ program
     .version('Version ' + packageJSON.version)
     .name(packageJSON.name)
     .option('--allowed-origins <origins>', 'semicolon-separated list of origins to allow the browser to request. Default is to allow all.', semicolonSeparatedList)
+    .option('--artifact-dir <path>', 'path to the directory for centralized artifact storage with session-specific subdirectories.')
     .option('--blocked-origins <origins>', 'semicolon-separated list of origins to block the browser from requesting. Blocklist is evaluated before allowlist. If used without the allowlist, requests not matching the blocklist are still allowed.', semicolonSeparatedList)
     .option('--block-service-workers', 'block service workers')
     .option('--browser <browser>', 'browser or chrome channel to use, possible values: chrome, firefox, webkit, msedge.')
@@ -104,9 +105,9 @@ function setupExitWatchdog(serverConfig: { host?: string; port?: number }) {
     process.exit(0);
   };
 
-  if (serverConfig.port !== undefined) {
+  if (serverConfig.port !== undefined)
     process.stdin.on('close', handleExit);
-  }
+
   process.on('SIGINT', handleExit);
   process.on('SIGTERM', handleExit);
 

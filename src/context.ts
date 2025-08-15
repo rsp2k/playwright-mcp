@@ -88,6 +88,12 @@ export class Context {
     }
   }
 
+  updateSessionId(customSessionId: string) {
+    testDebug(`updating sessionId from ${this.sessionId} to ${customSessionId}`);
+    // Note: sessionId is readonly, but we can update it for artifact management
+    (this as any).sessionId = customSessionId;
+  }
+
   tabs(): Tab[] {
     return this._tabs;
   }
@@ -350,19 +356,19 @@ export class Context {
     permissions?: string[];
   }): Promise<void> {
     const currentConfig = { ...this.config };
-    
+
     // Update the configuration
-    if (changes.headless !== undefined) {
+    if (changes.headless !== undefined)
       currentConfig.browser.launchOptions.headless = changes.headless;
-    }
-    
+
+
     // Handle device emulation - this overrides individual viewport/userAgent settings
     if (changes.device) {
-      if (!devices[changes.device]) {
+      if (!devices[changes.device])
         throw new Error(`Unknown device: ${changes.device}`);
-      }
+
       const deviceConfig = devices[changes.device];
-      
+
       // Apply all device properties to context options
       currentConfig.browser.contextOptions = {
         ...currentConfig.browser.contextOptions,
@@ -370,12 +376,12 @@ export class Context {
       };
     } else {
       // Apply individual settings only if no device is specified
-      if (changes.viewport) {
+      if (changes.viewport)
         currentConfig.browser.contextOptions.viewport = changes.viewport;
-      }
-      if (changes.userAgent) {
+
+      if (changes.userAgent)
         currentConfig.browser.contextOptions.userAgent = changes.userAgent;
-      }
+
     }
 
     // Apply additional context options
@@ -386,33 +392,33 @@ export class Context {
         accuracy: changes.geolocation.accuracy || 100
       };
     }
-    
-    if (changes.locale) {
+
+    if (changes.locale)
       currentConfig.browser.contextOptions.locale = changes.locale;
-    }
-    
-    if (changes.timezone) {
+
+
+    if (changes.timezone)
       currentConfig.browser.contextOptions.timezoneId = changes.timezone;
-    }
-    
-    if (changes.colorScheme) {
+
+
+    if (changes.colorScheme)
       currentConfig.browser.contextOptions.colorScheme = changes.colorScheme;
-    }
-    
-    if (changes.permissions) {
+
+
+    if (changes.permissions)
       currentConfig.browser.contextOptions.permissions = changes.permissions;
-    }
+
 
     // Store the modified config
     (this as any).config = currentConfig;
 
     // Close the current browser context to force recreation with new settings
     await this.closeBrowserContext();
-    
+
     // Clear tabs since they're attached to the old context
     this._tabs = [];
     this._currentTab = undefined;
-    
+
     testDebug(`browser config updated for session ${this.sessionId}: headless=${currentConfig.browser.launchOptions.headless}, viewport=${JSON.stringify(currentConfig.browser.contextOptions.viewport)}`);
   }
 
