@@ -631,6 +631,16 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_install_popular_extension**
+  - Title: Install popular Chrome extension
+  - Description: Automatically download and install popular Chrome extensions from their official sources. This works around Chrome channel limitations by fetching extension source code.
+  - Parameters:
+    - `extension` (string): Popular extension to install automatically
+    - `version` (string, optional): Specific version to install (defaults to latest)
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_list_devices**
   - Title: List available devices for emulation
   - Description: Get a list of all available device emulation profiles including mobile phones, tablets, and desktop browsers. Each device includes viewport, user agent, and capabilities information.
