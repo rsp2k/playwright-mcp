@@ -48,6 +48,17 @@ const configureArtifactsSchema = z.object({
   sessionId: z.string().optional().describe('Custom session ID for artifact organization (auto-generated if not provided)')
 });
 
+const installExtensionSchema = z.object({
+  path: z.string().describe('Path to the Chrome extension directory (containing manifest.json)'),
+  name: z.string().optional().describe('Optional friendly name for the extension')
+});
+
+const listExtensionsSchema = z.object({});
+
+const uninstallExtensionSchema = z.object({
+  path: z.string().describe('Path to the Chrome extension directory to uninstall')
+});
+
 export default [
   defineTool({
     capability: 'core',
@@ -267,7 +278,7 @@ export default [
         } else {
           // Show current status - re-check after potential changes
           const currentManager = currentSessionId ? registry.getManager(currentSessionId) : undefined;
-          
+
           if (currentManager && currentSessionId) {
             const stats = currentManager.getSessionStats();
             response.addResult(
@@ -301,6 +312,149 @@ export default [
 
       } catch (error) {
         throw new Error(`Failed to configure artifact storage: ${error}`);
+      }
+    },
+  }),
+  defineTool({
+    capability: 'core',
+    schema: {
+      name: 'browser_install_extension',
+      title: 'Install Chrome extension',
+      description: 'Install a Chrome extension in the current browser session. Only works with Chromium browser. For best results, use pure Chromium without the "chrome" channel. The extension must be an unpacked directory containing manifest.json.',
+      inputSchema: installExtensionSchema,
+      type: 'destructive',
+    },
+    handle: async (context: Context, params: z.output<typeof installExtensionSchema>, response: Response) => {
+      try {
+        // Validate that we're using Chromium
+        if (context.config.browser.browserName !== 'chromium')
+          throw new Error('Chrome extensions are only supported with Chromium browser. Use browser_configure to switch to chromium.');
+
+        // Additional validation for Chrome channel
+        const hasChannel = context.config.browser.launchOptions.channel;
+        if (hasChannel === 'chrome') {
+          response.addResult(
+              '⚠️  **Important**: You are using Chrome via the "chrome" channel.\n\n' +
+            'Chrome extensions work best with pure Chromium (no channel).\n' +
+            'If extensions don\'t load properly, consider:\n\n' +
+            '1. Installing pure Chromium: `sudo apt install chromium-browser` (Linux)\n' +
+            '2. Using browser_configure to remove the chrome channel\n' +
+            '3. Ensuring unpacked extensions are enabled in your browser settings\n\n' +
+            'Continuing with Chrome channel (extensions may not load)...\n'
+          );
+        }
+
+        // Validate extension path exists and contains manifest.json
+        const fs = await import('fs');
+        const path = await import('path');
+
+        if (!fs.existsSync(params.path))
+          throw new Error(`Extension directory not found: ${params.path}`);
+
+        const manifestPath = path.join(params.path, 'manifest.json');
+        if (!fs.existsSync(manifestPath))
+          throw new Error(`manifest.json not found in extension directory: ${params.path}`);
+
+        // Read and validate manifest
+        const manifestContent = fs.readFileSync(manifestPath, 'utf8');
+        let manifest;
+        try {
+          manifest = JSON.parse(manifestContent);
+        } catch (error) {
+          throw new Error(`Invalid manifest.json: ${error}`);
+        }
+
+        if (!manifest.name)
+          throw new Error('Extension manifest must contain a "name" field');
+
+        // Install the extension by updating browser configuration
+        await context.installExtension(params.path, params.name || manifest.name);
+
+        response.addResult(
+            `✅ Chrome extension installed successfully!\n\n` +
+          `Extension: ${params.name || manifest.name}\n` +
+          `Path: ${params.path}\n` +
+          `Manifest version: ${manifest.manifest_version || 'unknown'}\n\n` +
+          `The browser has been restarted with the extension loaded.\n` +
+          `Use browser_list_extensions to see all installed extensions.`
+        );
+
+      } catch (error) {
+        throw new Error(`Failed to install Chrome extension: ${error}`);
+      }
+    },
+  }),
+  defineTool({
+    capability: 'core',
+    schema: {
+      name: 'browser_list_extensions',
+      title: 'List installed Chrome extensions',
+      description: 'List all Chrome extensions currently installed in the browser session. Only works with Chromium browser.',
+      inputSchema: listExtensionsSchema,
+      type: 'readOnly',
+    },
+    handle: async (context: Context, params: z.output<typeof listExtensionsSchema>, response: Response) => {
+      try {
+        // Validate that we're using Chromium
+        if (context.config.browser.browserName !== 'chromium')
+          throw new Error('Chrome extensions are only supported with Chromium browser.');
+
+        const extensions = context.getInstalledExtensions();
+
+        if (extensions.length === 0) {
+          response.addResult('No Chrome extensions are currently installed.\n\nUse browser_install_extension to install extensions.');
+          return;
+        }
+
+        let result = `Installed Chrome extensions (${extensions.length}):\n\n`;
+
+        extensions.forEach((ext, index) => {
+          result += `${index + 1}. **${ext.name}**\n`;
+          result += `   Path: ${ext.path}\n`;
+          if (ext.version)
+            result += `   Version: ${ext.version}\n`;
+          result += '\n';
+        });
+
+        result += 'Use browser_uninstall_extension to remove extensions.';
+
+        response.addResult(result);
+
+      } catch (error) {
+        throw new Error(`Failed to list Chrome extensions: ${error}`);
+      }
+    },
+  }),
+  defineTool({
+    capability: 'core',
+    schema: {
+      name: 'browser_uninstall_extension',
+      title: 'Uninstall Chrome extension',
+      description: 'Uninstall a Chrome extension from the current browser session. Only works with Chromium browser.',
+      inputSchema: uninstallExtensionSchema,
+      type: 'destructive',
+    },
+    handle: async (context: Context, params: z.output<typeof uninstallExtensionSchema>, response: Response) => {
+      try {
+        // Validate that we're using Chromium
+        if (context.config.browser.browserName !== 'chromium')
+          throw new Error('Chrome extensions are only supported with Chromium browser.');
+
+        const removedExtension = await context.uninstallExtension(params.path);
+
+        if (!removedExtension)
+          throw new Error(`Extension not found: ${params.path}`);
+
+        response.addResult(
+            `✅ Chrome extension uninstalled successfully!\n\n` +
+          `Extension: ${removedExtension.name}\n` +
+          `Path: ${params.path}\n\n` +
+          `The browser has been restarted without this extension.\n` +
+          `Use browser_list_extensions to see remaining extensions.`
+        );
+
+      } catch (error) {
+        throw new Error(`Failed to uninstall Chrome extension: ${error}`);
       }
     },
   }),

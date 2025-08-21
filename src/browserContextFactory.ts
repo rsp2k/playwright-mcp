@@ -36,7 +36,7 @@ export function contextFactory(browserConfig: FullConfig['browser']): BrowserCon
 }
 
 export interface BrowserContextFactory {
-  createContext(clientInfo: { name: string, version: string }): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }>;
+  createContext(clientInfo: { name: string, version: string }, extensionPaths?: string[]): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }>;
 }
 
 class BaseContextFactory implements BrowserContextFactory {
@@ -68,14 +68,14 @@ class BaseContextFactory implements BrowserContextFactory {
     throw new Error('Not implemented');
   }
 
-  async createContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
+  async createContext(clientInfo: { name: string, version: string }, extensionPaths?: string[]): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
     testDebug(`create browser context (${this.name})`);
     const browser = await this._obtainBrowser();
-    const browserContext = await this._doCreateContext(browser);
+    const browserContext = await this._doCreateContext(browser, extensionPaths);
     return { browserContext, close: () => this._closeBrowserContext(browserContext, browser) };
   }
 
-  protected async _doCreateContext(browser: playwright.Browser): Promise<playwright.BrowserContext> {
+  protected async _doCreateContext(browser: playwright.Browser, extensionPaths?: string[]): Promise<playwright.BrowserContext> {
     throw new Error('Not implemented');
   }
 
@@ -92,25 +92,52 @@ class BaseContextFactory implements BrowserContextFactory {
 }
 
 class IsolatedContextFactory extends BaseContextFactory {
+  private _extensionPaths: string[] = [];
+
   constructor(browserConfig: FullConfig['browser']) {
     super('isolated', browserConfig);
+  }
+
+  async createContext(clientInfo: { name: string, version: string }, extensionPaths?: string[]): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
+    // Update extension paths and recreate browser if extensions changed
+    const hasExtensionsChanged = JSON.stringify(this._extensionPaths) !== JSON.stringify(extensionPaths || []);
+
+    if (hasExtensionsChanged) {
+      this._extensionPaths = extensionPaths || [];
+      // Force browser recreation with new extensions
+      this._browserPromise = undefined;
+    }
+
+    return super.createContext(clientInfo, extensionPaths);
   }
 
   protected override async _doObtainBrowser(): Promise<playwright.Browser> {
     await injectCdpPort(this.browserConfig);
     const browserType = playwright[this.browserConfig.browserName];
-    return browserType.launch({
+
+    const launchOptions = {
       ...this.browserConfig.launchOptions,
       handleSIGINT: false,
       handleSIGTERM: false,
-    }).catch(error => {
+    };
+
+    // Add Chrome extension support for Chromium
+    if (this.browserConfig.browserName === 'chromium' && this._extensionPaths.length > 0) {
+      testDebug(`Launching browser with ${this._extensionPaths.length} Chrome extensions: ${this._extensionPaths.join(', ')}`);
+      launchOptions.args = [
+        ...(launchOptions.args || []),
+        ...this._extensionPaths.map(path => `--load-extension=${path}`)
+      ];
+    }
+
+    return browserType.launch(launchOptions).catch(error => {
       if (error.message.includes('Executable doesn\'t exist'))
         throw new Error(`Browser specified in your config is not installed. Either install it (likely) or change the config.`);
       throw error;
     });
   }
 
-  protected override async _doCreateContext(browser: playwright.Browser): Promise<playwright.BrowserContext> {
+  protected override async _doCreateContext(browser: playwright.Browser, extensionPaths?: string[]): Promise<playwright.BrowserContext> {
     return browser.newContext(this.browserConfig.contextOptions);
   }
 }
@@ -124,7 +151,9 @@ class CdpContextFactory extends BaseContextFactory {
     return playwright.chromium.connectOverCDP(this.browserConfig.cdpEndpoint!);
   }
 
-  protected override async _doCreateContext(browser: playwright.Browser): Promise<playwright.BrowserContext> {
+  protected override async _doCreateContext(browser: playwright.Browser, extensionPaths?: string[]): Promise<playwright.BrowserContext> {
+    if (extensionPaths && extensionPaths.length > 0)
+      testDebug('Warning: Chrome extensions are not supported with CDP connections');
     return this.browserConfig.isolated ? await browser.newContext() : browser.contexts()[0];
   }
 }
@@ -142,7 +171,9 @@ class RemoteContextFactory extends BaseContextFactory {
     return playwright[this.browserConfig.browserName].connect(String(url));
   }
 
-  protected override async _doCreateContext(browser: playwright.Browser): Promise<playwright.BrowserContext> {
+  protected override async _doCreateContext(browser: playwright.Browser, extensionPaths?: string[]): Promise<playwright.BrowserContext> {
+    if (extensionPaths && extensionPaths.length > 0)
+      testDebug('Warning: Chrome extensions are not supported with remote browser connections');
     return browser.newContext();
   }
 }
@@ -155,7 +186,7 @@ class PersistentContextFactory implements BrowserContextFactory {
     this.browserConfig = browserConfig;
   }
 
-  async createContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
+  async createContext(clientInfo: { name: string, version: string }, extensionPaths?: string[]): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {
     await injectCdpPort(this.browserConfig);
     testDebug('create browser context (persistent)');
     const userDataDir = this.browserConfig.userDataDir ?? await this._createUserDataDir();
@@ -163,15 +194,26 @@ class PersistentContextFactory implements BrowserContextFactory {
     this._userDataDirs.add(userDataDir);
     testDebug('lock user data dir', userDataDir);
 
+    const launchOptions = {
+      ...this.browserConfig.launchOptions,
+      ...this.browserConfig.contextOptions,
+      handleSIGINT: false,
+      handleSIGTERM: false,
+    };
+
+    // Add Chrome extension support for Chromium
+    if (this.browserConfig.browserName === 'chromium' && extensionPaths && extensionPaths.length > 0) {
+      testDebug(`Loading ${extensionPaths.length} Chrome extensions in persistent context: ${extensionPaths.join(', ')}`);
+      launchOptions.args = [
+        ...(launchOptions.args || []),
+        ...extensionPaths.map(path => `--load-extension=${path}`)
+      ];
+    }
+
     const browserType = playwright[this.browserConfig.browserName];
     for (let i = 0; i < 5; i++) {
       try {
-        const browserContext = await browserType.launchPersistentContext(userDataDir, {
-          ...this.browserConfig.launchOptions,
-          ...this.browserConfig.contextOptions,
-          handleSIGINT: false,
-          handleSIGTERM: false,
-        });
+        const browserContext = await browserType.launchPersistentContext(userDataDir, launchOptions);
         const close = () => this._closeBrowserContext(browserContext, userDataDir);
         return { browserContext, close };
       } catch (error: any) {

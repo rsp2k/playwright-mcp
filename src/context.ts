@@ -48,6 +48,9 @@ export class Context {
   readonly sessionId: string;
   private _sessionStartTime: number;
 
+  // Chrome extension management
+  private _installedExtensions: Array<{ path: string; name: string; version?: string }> = [];
+
   constructor(tools: Tool[], config: FullConfig, browserContextFactory: BrowserContextFactory, environmentIntrospector?: EnvironmentIntrospector) {
     this.tools = tools;
     this.config = config;
@@ -250,7 +253,7 @@ export class Context {
       result = await this._createVideoEnabledContext();
     } else {
       // Use the standard browser context factory
-      result = await this._browserContextFactory.createContext(this.clientVersion!);
+      result = await this._browserContextFactory.createContext(this.clientVersion!, this._getExtensionPaths());
     }
     const { browserContext } = result;
     await this._setupRequestInterception(browserContext);
@@ -275,12 +278,24 @@ export class Context {
     // Get environment-specific browser options
     const envOptions = this._environmentIntrospector.getRecommendedBrowserOptions();
 
-    const browser = await browserType.launch({
+    const launchOptions = {
       ...this.config.browser.launchOptions,
       ...envOptions, // Include environment-detected options
       handleSIGINT: false,
       handleSIGTERM: false,
-    });
+    };
+
+    // Add Chrome extension support for Chromium
+    const extensionPaths = this._getExtensionPaths();
+    if (this.config.browser.browserName === 'chromium' && extensionPaths.length > 0) {
+      testDebug(`Loading ${extensionPaths.length} Chrome extensions in video context: ${extensionPaths.join(', ')}`);
+      launchOptions.args = [
+        ...(launchOptions.args || []),
+        ...extensionPaths.map(path => `--load-extension=${path}`)
+      ];
+    }
+
+    const browser = await browserType.launch(launchOptions);
 
     // Use environment-specific video directory if available
     const videoConfig = envOptions.recordVideo ?
@@ -450,5 +465,82 @@ export class Context {
     this._videoBaseFilename = undefined;
 
     return videoPaths;
+  }
+
+  // Chrome Extension Management
+
+  async installExtension(extensionPath: string, extensionName: string): Promise<void> {
+    if (this.config.browser.browserName !== 'chromium')
+      throw new Error('Chrome extensions are only supported with Chromium browser.');
+
+    // Check if extension is already installed
+    const existingExtension = this._installedExtensions.find(ext => ext.path === extensionPath);
+    if (existingExtension)
+      throw new Error(`Extension is already installed: ${extensionName} (${extensionPath})`);
+
+    // Read extension manifest to get version info
+    const fs = await import('fs');
+    const path = await import('path');
+    const manifestPath = path.join(extensionPath, 'manifest.json');
+
+    let version: string | undefined;
+    try {
+      const manifestContent = fs.readFileSync(manifestPath, 'utf8');
+      const manifest = JSON.parse(manifestContent);
+      version = manifest.version;
+    } catch (error) {
+      testDebug('Could not read extension version:', error);
+    }
+
+    // Add to installed extensions list
+    this._installedExtensions.push({
+      path: extensionPath,
+      name: extensionName,
+      version
+    });
+
+    testDebug(`Installing Chrome extension: ${extensionName} from ${extensionPath}`);
+
+    // Restart browser with updated extension list
+    await this._restartBrowserWithExtensions();
+  }
+
+  getInstalledExtensions(): Array<{ path: string; name: string; version?: string }> {
+    return [...this._installedExtensions];
+  }
+
+  async uninstallExtension(extensionPath: string): Promise<{ path: string; name: string; version?: string } | null> {
+    const extensionIndex = this._installedExtensions.findIndex(ext => ext.path === extensionPath);
+
+    if (extensionIndex === -1)
+      return null;
+
+    const removedExtension = this._installedExtensions.splice(extensionIndex, 1)[0];
+
+    testDebug(`Uninstalling Chrome extension: ${removedExtension.name} from ${extensionPath}`);
+
+    // Restart browser with updated extension list
+    await this._restartBrowserWithExtensions();
+
+    return removedExtension;
+  }
+
+  private async _restartBrowserWithExtensions(): Promise<void> {
+    // Close existing browser context if open
+    if (this._browserContextPromise) {
+      const { close } = await this._browserContextPromise;
+      await close();
+      this._browserContextPromise = undefined;
+    }
+
+    // Clear all tabs as they will be recreated
+    this._tabs = [];
+    this._currentTab = undefined;
+
+    testDebug(`Restarting browser with ${this._installedExtensions.length} extensions`);
+  }
+
+  private _getExtensionPaths(): string[] {
+    return this._installedExtensions.map(ext => ext.path);
   }
 }

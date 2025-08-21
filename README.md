@@ -621,9 +621,27 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_install_extension**
+  - Title: Install Chrome extension
+  - Description: Install a Chrome extension in the current browser session. Only works with Chromium browser. For best results, use pure Chromium without the "chrome" channel. The extension must be an unpacked directory containing manifest.json.
+  - Parameters:
+    - `path` (string): Path to the Chrome extension directory (containing manifest.json)
+    - `name` (string, optional): Optional friendly name for the extension
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_list_devices**
   - Title: List available devices for emulation
   - Description: Get a list of all available device emulation profiles including mobile phones, tablets, and desktop browsers. Each device includes viewport, user agent, and capabilities information.
+  - Parameters: None
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_list_extensions**
+  - Title: List installed Chrome extensions
+  - Description: List all Chrome extensions currently installed in the browser session. Only works with Chromium browser.
   - Parameters: None
   - Read-only: **true**
 
@@ -748,6 +766,15 @@ http.createServer(async (req, res) => {
     - `text` (string): Text to type into the element
     - `submit` (boolean, optional): Whether to submit entered text (press Enter after)
     - `slowly` (boolean, optional): Whether to type one character at a time. Useful for triggering key handlers in the page. By default entire text is filled in at once.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_uninstall_extension**
+  - Title: Uninstall Chrome extension
+  - Description: Uninstall a Chrome extension from the current browser session. Only works with Chromium browser.
+  - Parameters:
+    - `path` (string): Path to the Chrome extension directory to uninstall
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
