@@ -40,7 +40,7 @@ const selectTab = defineTool({
   schema: {
     name: 'browser_tab_select',
     title: 'Select a tab',
-    description: 'Select a tab by index',
+    description: 'Select a tab by index. Returns page snapshot after selecting tab (configurable via browser_configure_snapshots).',
     inputSchema: z.object({
       index: z.number().describe('The index of the tab to select'),
     }),
@@ -59,7 +59,7 @@ const newTab = defineTool({
   schema: {
     name: 'browser_tab_new',
     title: 'Open a new tab',
-    description: 'Open a new tab',
+    description: 'Open a new tab. Returns page snapshot after opening tab (configurable via browser_configure_snapshots).',
     inputSchema: z.object({
       url: z.string().optional().describe('The URL to navigate to in the new tab. If not provided, the new tab will be blank.'),
     }),
@@ -80,7 +80,7 @@ const closeTab = defineTool({
   schema: {
     name: 'browser_tab_close',
     title: 'Close a tab',
-    description: 'Close a tab',
+    description: 'Close a tab. Returns page snapshot after closing tab (configurable via browser_configure_snapshots).',
     inputSchema: z.object({
       index: z.number().optional().describe('The index of the tab to close. Closes current tab if not provided.'),
     }),
