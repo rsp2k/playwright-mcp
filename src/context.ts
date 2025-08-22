@@ -51,6 +51,10 @@ export class Context {
   // Chrome extension management
   private _installedExtensions: Array<{ path: string; name: string; version?: string }> = [];
 
+  // Differential snapshot tracking
+  private _lastSnapshotFingerprint: string | undefined;
+  private _lastPageState: { url: string; title: string } | undefined;
+
   constructor(tools: Tool[], config: FullConfig, browserContextFactory: BrowserContextFactory, environmentIntrospector?: EnvironmentIntrospector) {
     this.tools = tools;
     this.config = config;
@@ -542,5 +546,94 @@ export class Context {
 
   private _getExtensionPaths(): string[] {
     return this._installedExtensions.map(ext => ext.path);
+  }
+
+  // Differential snapshot methods
+  private createSnapshotFingerprint(snapshot: string): string {
+    // Create a lightweight fingerprint of the page structure
+    // Extract key elements: URL, title, main interactive elements, error states
+    const lines = snapshot.split('\n');
+    const significantLines: string[] = [];
+
+    for (const line of lines) {
+      if (line.includes('Page URL:') ||
+          line.includes('Page Title:') ||
+          line.includes('error') || line.includes('Error') ||
+          line.includes('button') || line.includes('link') ||
+          line.includes('tab') || line.includes('navigation') ||
+          line.includes('form') || line.includes('input'))
+        significantLines.push(line.trim());
+
+    }
+
+    return significantLines.join('|').substring(0, 1000); // Limit size
+  }
+
+  async generateDifferentialSnapshot(): Promise<string> {
+    if (!this.config.differentialSnapshots || !this.currentTab())
+      return '';
+
+
+    const currentTab = this.currentTabOrDie();
+    const currentUrl = currentTab.page.url();
+    const currentTitle = await currentTab.page.title();
+    const rawSnapshot = await currentTab.captureSnapshot();
+    const currentFingerprint = this.createSnapshotFingerprint(rawSnapshot);
+
+    // First time or no previous state
+    if (!this._lastSnapshotFingerprint || !this._lastPageState) {
+      this._lastSnapshotFingerprint = currentFingerprint;
+      this._lastPageState = { url: currentUrl, title: currentTitle };
+      return `### Page Changes (Differential Mode - First Snapshot)\n✓ Initial page state captured\n- URL: ${currentUrl}\n- Title: ${currentTitle}\n\n**💡 Tip: Subsequent operations will show only changes**`;
+    }
+
+    // Compare with previous state
+    const changes: string[] = [];
+    let hasSignificantChanges = false;
+
+    if (this._lastPageState.url !== currentUrl) {
+      changes.push(`📍 **URL changed:** ${this._lastPageState.url} → ${currentUrl}`);
+      hasSignificantChanges = true;
+    }
+
+    if (this._lastPageState.title !== currentTitle) {
+      changes.push(`📝 **Title changed:** "${this._lastPageState.title}" → "${currentTitle}"`);
+      hasSignificantChanges = true;
+    }
+
+    if (this._lastSnapshotFingerprint !== currentFingerprint) {
+      changes.push(`🔄 **Page structure changed** (DOM elements modified)`);
+      hasSignificantChanges = true;
+    }
+
+    // Check for console messages or errors
+    const recentConsole = (currentTab as any)._takeRecentConsoleMarkdown?.() || [];
+    if (recentConsole.length > 0) {
+      changes.push(`🔍 **New console activity** (${recentConsole.length} messages)`);
+      hasSignificantChanges = true;
+    }
+
+    // Update tracking
+    this._lastSnapshotFingerprint = currentFingerprint;
+    this._lastPageState = { url: currentUrl, title: currentTitle };
+
+    if (!hasSignificantChanges)
+      return `### Page Changes (Differential Mode)\n✓ **No significant changes detected**\n- Same URL: ${currentUrl}\n- Same title: "${currentTitle}"\n- DOM structure: unchanged\n- Console activity: none\n\n**💡 Tip: Use \`browser_snapshot\` for full page view**`;
+
+
+    const result = [
+      '### Page Changes (Differential Mode)',
+      `🆕 **Changes detected:**`,
+      ...changes.map(change => `- ${change}`),
+      '',
+      '**💡 Tip: Use `browser_snapshot` for complete page details**'
+    ];
+
+    return result.join('\n');
+  }
+
+  resetDifferentialSnapshot(): void {
+    this._lastSnapshotFingerprint = undefined;
+    this._lastPageState = undefined;
   }
 }

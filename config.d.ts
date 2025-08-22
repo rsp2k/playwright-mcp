@@ -122,4 +122,25 @@ export type Config = {
    * Whether to send image responses to the client. Can be "allow", "omit", or "auto". Defaults to "auto", which sends images if the client can display them.
    */
   imageResponses?: 'allow' | 'omit';
+
+  /**
+   * Whether to include page snapshots automatically after interactive operations like clicks.
+   * When disabled, tools will run without generating snapshots unless explicitly requested.
+   * Default is true for backward compatibility.
+   */
+  includeSnapshots?: boolean;
+
+  /**
+   * Maximum number of tokens allowed in page snapshots before truncation.
+   * When a snapshot exceeds this limit, it will be truncated with a helpful message.
+   * Use 0 to disable truncation. Default is 10000.
+   */
+  maxSnapshotTokens?: number;
+
+  /**
+   * Enable differential snapshots that only show changes since the last snapshot.
+   * When enabled, tools will show page changes instead of full snapshots.
+   * Default is false.
+   */
+  differentialSnapshots?: boolean;
 };

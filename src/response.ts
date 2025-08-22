@@ -16,6 +16,7 @@
 
 import type  { ImageContent, TextContent } from '@modelcontextprotocol/sdk/types.js';
 import type { Context } from './context.js';
+import type { FullConfig } from './config.js';
 
 export class Response {
   private _result: string[] = [];
@@ -25,14 +26,16 @@ export class Response {
   private _includeSnapshot = false;
   private _includeTabs = false;
   private _snapshot: string | undefined;
+  private _config: FullConfig;
 
   readonly toolName: string;
   readonly toolArgs: Record<string, any>;
 
-  constructor(context: Context, toolName: string, toolArgs: Record<string, any>) {
+  constructor(context: Context, toolName: string, toolArgs: Record<string, any>, config: FullConfig) {
     this._context = context;
     this.toolName = toolName;
     this.toolArgs = toolArgs;
+    this._config = config;
   }
 
   addResult(result: string) {
@@ -60,6 +63,12 @@ export class Response {
   }
 
   setIncludeSnapshot() {
+    // Only enable snapshots if configured to do so
+    this._includeSnapshot = this._config.includeSnapshots;
+  }
+
+  setForceIncludeSnapshot() {
+    // Force snapshot regardless of config (for explicit snapshot tools)
     this._includeSnapshot = true;
   }
 
@@ -67,13 +76,88 @@ export class Response {
     this._includeTabs = true;
   }
 
+  private estimateTokenCount(text: string): number {
+    // Rough estimation: ~4 characters per token for English text
+    // This is a conservative estimate that works well for accessibility snapshots
+    return Math.ceil(text.length / 4);
+  }
+
+  private truncateSnapshot(snapshot: string, maxTokens: number): string {
+    const estimatedTokens = this.estimateTokenCount(snapshot);
+
+    if (maxTokens <= 0 || estimatedTokens <= maxTokens)
+      return snapshot;
+
+
+    // Calculate how much text to keep (leave room for truncation message)
+    const truncationMessageTokens = 200; // Reserve space for helpful message
+    const keepTokens = Math.max(100, maxTokens - truncationMessageTokens);
+    const keepChars = keepTokens * 4;
+
+    const lines = snapshot.split('\n');
+    let truncatedSnapshot = '';
+    let currentLength = 0;
+
+    // Extract essential info first (URL, title, errors)
+    const essentialLines: string[] = [];
+    const contentLines: string[] = [];
+
+    for (const line of lines) {
+      if (line.includes('Page URL:') || line.includes('Page Title:') ||
+          line.includes('### Page state') || line.includes('error') || line.includes('Error'))
+        essentialLines.push(line);
+      else
+        contentLines.push(line);
+
+    }
+
+    // Always include essential info
+    for (const line of essentialLines) {
+      if (currentLength + line.length < keepChars) {
+        truncatedSnapshot += line + '\n';
+        currentLength += line.length + 1;
+      }
+    }
+
+    // Add as much content as possible
+    for (const line of contentLines) {
+      if (currentLength + line.length < keepChars) {
+        truncatedSnapshot += line + '\n';
+        currentLength += line.length + 1;
+      } else {
+        break;
+      }
+    }
+
+    // Add truncation message with helpful suggestions
+    const truncationMessage = `\n**⚠️ Snapshot truncated: showing ${this.estimateTokenCount(truncatedSnapshot).toLocaleString()} of ${estimatedTokens.toLocaleString()} tokens**\n\n**Options to see full snapshot:**\n- Use \`browser_snapshot\` tool for complete page snapshot\n- Increase limit: \`--max-snapshot-tokens ${Math.ceil(estimatedTokens * 1.2)}\`\n- Enable differential mode: \`--differential-snapshots\`\n- Disable auto-snapshots: \`--no-snapshots\`\n`;
+
+    return truncatedSnapshot + truncationMessage;
+  }
+
   async snapshot(): Promise<string> {
     if (this._snapshot !== undefined)
       return this._snapshot;
-    if (this._includeSnapshot && this._context.currentTab())
-      this._snapshot = await this._context.currentTabOrDie().captureSnapshot();
-    else
+
+    if (this._includeSnapshot && this._context.currentTab()) {
+      let rawSnapshot: string;
+
+      // Use differential snapshots if enabled
+      if (this._config.differentialSnapshots)
+        rawSnapshot = await this._context.generateDifferentialSnapshot();
+      else
+        rawSnapshot = await this._context.currentTabOrDie().captureSnapshot();
+
+
+      // Apply truncation if maxSnapshotTokens is configured (but not for differential snapshots which are already small)
+      if (this._config.maxSnapshotTokens > 0 && !this._config.differentialSnapshots)
+        this._snapshot = this.truncateSnapshot(rawSnapshot, this._config.maxSnapshotTokens);
+      else
+        this._snapshot = rawSnapshot;
+
+    } else {
       this._snapshot = '';
+    }
     return this._snapshot;
   }
 

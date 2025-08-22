@@ -45,6 +45,9 @@ program
     .option('--ignore-https-errors', 'ignore https errors')
     .option('--isolated', 'keep the browser profile in memory, do not save it to disk.')
     .option('--image-responses <mode>', 'whether to send image responses to the client. Can be "allow" or "omit", Defaults to "allow".')
+    .option('--no-snapshots', 'disable automatic page snapshots after interactive operations like clicks. Use browser_snapshot tool for explicit snapshots.')
+    .option('--max-snapshot-tokens <tokens>', 'maximum number of tokens allowed in page snapshots before truncation. Use 0 to disable truncation. Default is 10000.', parseInt)
+    .option('--differential-snapshots', 'enable differential snapshots that only show changes since the last snapshot instead of full page snapshots.')
     .option('--no-sandbox', 'disable the sandbox for all process types that are normally sandboxed.')
     .option('--output-dir <path>', 'path to the directory for output files.')
     .option('--port <port>', 'port to listen on for SSE transport.')
@@ -66,6 +69,10 @@ program
         console.error('The --vision option is deprecated, use --caps=vision instead');
         options.caps = 'vision';
       }
+      // Handle negated boolean options
+      if (options.noSnapshots !== undefined)
+        options.includeSnapshots = !options.noSnapshots;
+
       const config = await resolveCLIConfig(options);
       const abortController = setupExitWatchdog(config.server);
 

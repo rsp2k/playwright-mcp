@@ -142,51 +142,65 @@ Playwright MCP server supports following arguments. They can be provided in the 
 
 ```
 > npx @playwright/mcp@latest --help
-  --allowed-origins <origins>  semicolon-separated list of origins to allow the
-                               browser to request. Default is to allow all.
-  --artifact-dir <path>        path to the directory for centralized artifact
-                               storage with session-specific subdirectories.
-  --blocked-origins <origins>  semicolon-separated list of origins to block the
-                               browser from requesting. Blocklist is evaluated
-                               before allowlist. If used without the allowlist,
-                               requests not matching the blocklist are still
-                               allowed.
-  --block-service-workers      block service workers
-  --browser <browser>          browser or chrome channel to use, possible
-                               values: chrome, firefox, webkit, msedge.
-  --caps <caps>                comma-separated list of additional capabilities
-                               to enable, possible values: vision, pdf.
-  --cdp-endpoint <endpoint>    CDP endpoint to connect to.
-  --config <path>              path to the configuration file.
-  --device <device>            device to emulate, for example: "iPhone 15"
-  --executable-path <path>     path to the browser executable.
-  --headless                   run browser in headless mode, headed by default
-  --host <host>                host to bind server to. Default is localhost. Use
-                               0.0.0.0 to bind to all interfaces.
-  --ignore-https-errors        ignore https errors
-  --isolated                   keep the browser profile in memory, do not save
-                               it to disk.
-  --image-responses <mode>     whether to send image responses to the client.
-                               Can be "allow" or "omit", Defaults to "allow".
-  --no-sandbox                 disable the sandbox for all process types that
-                               are normally sandboxed.
-  --output-dir <path>          path to the directory for output files.
-  --port <port>                port to listen on for SSE transport.
-  --proxy-bypass <bypass>      comma-separated domains to bypass proxy, for
-                               example ".com,chromium.org,.domain.com"
-  --proxy-server <proxy>       specify proxy server, for example
-                               "http://myproxy:3128" or "socks5://myproxy:8080"
-  --save-session               Whether to save the Playwright MCP session into
-                               the output directory.
-  --save-trace                 Whether to save the Playwright Trace of the
-                               session into the output directory.
-  --storage-state <path>       path to the storage state file for isolated
-                               sessions.
-  --user-agent <ua string>     specify user agent string
-  --user-data-dir <path>       path to the user data directory. If not
-                               specified, a temporary directory will be created.
-  --viewport-size <size>       specify browser viewport size in pixels, for
-                               example "1280, 720"
+  --allowed-origins <origins>     semicolon-separated list of origins to allow
+                                  the browser to request. Default is to allow
+                                  all.
+  --artifact-dir <path>           path to the directory for centralized artifact
+                                  storage with session-specific subdirectories.
+  --blocked-origins <origins>     semicolon-separated list of origins to block
+                                  the browser from requesting. Blocklist is
+                                  evaluated before allowlist. If used without
+                                  the allowlist, requests not matching the
+                                  blocklist are still allowed.
+  --block-service-workers         block service workers
+  --browser <browser>             browser or chrome channel to use, possible
+                                  values: chrome, firefox, webkit, msedge.
+  --caps <caps>                   comma-separated list of additional
+                                  capabilities to enable, possible values:
+                                  vision, pdf.
+  --cdp-endpoint <endpoint>       CDP endpoint to connect to.
+  --config <path>                 path to the configuration file.
+  --device <device>               device to emulate, for example: "iPhone 15"
+  --executable-path <path>        path to the browser executable.
+  --headless                      run browser in headless mode, headed by
+                                  default
+  --host <host>                   host to bind server to. Default is localhost.
+                                  Use 0.0.0.0 to bind to all interfaces.
+  --ignore-https-errors           ignore https errors
+  --isolated                      keep the browser profile in memory, do not
+                                  save it to disk.
+  --image-responses <mode>        whether to send image responses to the client.
+                                  Can be "allow" or "omit", Defaults to "allow".
+  --no-snapshots                  disable automatic page snapshots after
+                                  interactive operations like clicks. Use
+                                  browser_snapshot tool for explicit snapshots.
+  --max-snapshot-tokens <tokens>  maximum number of tokens allowed in page
+                                  snapshots before truncation. Use 0 to disable
+                                  truncation. Default is 10000.
+  --differential-snapshots        enable differential snapshots that only show
+                                  changes since the last snapshot instead of
+                                  full page snapshots.
+  --no-sandbox                    disable the sandbox for all process types that
+                                  are normally sandboxed.
+  --output-dir <path>             path to the directory for output files.
+  --port <port>                   port to listen on for SSE transport.
+  --proxy-bypass <bypass>         comma-separated domains to bypass proxy, for
+                                  example ".com,chromium.org,.domain.com"
+  --proxy-server <proxy>          specify proxy server, for example
+                                  "http://myproxy:3128" or
+                                  "socks5://myproxy:8080"
+  --save-session                  Whether to save the Playwright MCP session
+                                  into the output directory.
+  --save-trace                    Whether to save the Playwright Trace of the
+                                  session into the output directory.
+  --storage-state <path>          path to the storage state file for isolated
+                                  sessions.
+  --user-agent <ua string>        specify user agent string
+  --user-data-dir <path>          path to the user data directory. If not
+                                  specified, a temporary directory will be
+                                  created.
+  --viewport-size <size>          specify browser viewport size in pixels, for
+                                  example "1280, 720"
 ```
 
 <!--- End of options generated section -->
@@ -515,7 +529,7 @@ http.createServer(async (req, res) => {
 
 - **browser_click**
   - Title: Click
-  - Description: Perform click on a web page
+  - Description: Perform click on a web page. Returns page snapshot after click unless disabled with --no-snapshots. Large snapshots (>10k tokens) are truncated - use browser_snapshot for full capture.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -571,7 +585,7 @@ http.createServer(async (req, res) => {
 
 - **browser_drag**
   - Title: Drag mouse
-  - Description: Perform drag and drop between two elements
+  - Description: Perform drag and drop between two elements. Returns page snapshot after drag unless disabled with --no-snapshots.
   - Parameters:
     - `startElement` (string): Human-readable source element description used to obtain the permission to interact with the element
     - `startRef` (string): Exact source element reference from the page snapshot
@@ -613,7 +627,7 @@ http.createServer(async (req, res) => {
 
 - **browser_hover**
   - Title: Hover mouse
-  - Description: Hover over element on page
+  - Description: Hover over element on page. Returns page snapshot after hover unless disabled with --no-snapshots.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -659,7 +673,7 @@ http.createServer(async (req, res) => {
 
 - **browser_navigate**
   - Title: Navigate to a URL
-  - Description: Navigate to a URL
+  - Description: Navigate to a URL. Returns page snapshot after navigation unless disabled with --no-snapshots.
   - Parameters:
     - `url` (string): The URL to navigate to
   - Read-only: **false**
@@ -692,7 +706,7 @@ http.createServer(async (req, res) => {
 
 - **browser_press_key**
   - Title: Press a key
-  - Description: Press a key on the keyboard
+  - Description: Press a key on the keyboard. Returns page snapshot after keypress unless disabled with --no-snapshots.
   - Parameters:
     - `key` (string): Name of the key to press or a character to generate, such as `ArrowLeft` or `a`
   - Read-only: **false**
@@ -719,7 +733,7 @@ http.createServer(async (req, res) => {
 
 - **browser_select_option**
   - Title: Select option
-  - Description: Select an option in a dropdown
+  - Description: Select an option in a dropdown. Returns page snapshot after selection unless disabled with --no-snapshots.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -730,7 +744,7 @@ http.createServer(async (req, res) => {
 
 - **browser_snapshot**
   - Title: Page snapshot
-  - Description: Capture accessibility snapshot of the current page, this is better than screenshot
+  - Description: Capture complete accessibility snapshot of the current page. Always returns full snapshot regardless of --no-snapshots or size limits. Better than screenshot for understanding page structure.
   - Parameters: None
   - Read-only: **true**
 
@@ -769,7 +783,7 @@ http.createServer(async (req, res) => {
 
 - **browser_type**
   - Title: Type text
-  - Description: Type text into editable element
+  - Description: Type text into editable element. Returns page snapshot after typing unless disabled with --no-snapshots.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot

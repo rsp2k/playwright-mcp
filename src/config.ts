@@ -38,6 +38,9 @@ export type CLIOptions = {
   ignoreHttpsErrors?: boolean;
   isolated?: boolean;
   imageResponses?: 'allow' | 'omit';
+  includeSnapshots?: boolean;
+  maxSnapshotTokens?: number;
+  differentialSnapshots?: boolean;
   sandbox?: boolean;
   outputDir?: string;
   port?: number;
@@ -70,6 +73,9 @@ const defaultConfig: FullConfig = {
   },
   server: {},
   outputDir: path.join(os.tmpdir(), 'playwright-mcp-output', sanitizeForFilePath(new Date().toISOString())),
+  includeSnapshots: true,
+  maxSnapshotTokens: 10000,
+  differentialSnapshots: false,
 };
 
 type BrowserUserConfig = NonNullable<Config['browser']>;
@@ -84,6 +90,9 @@ export type FullConfig = Config & {
   outputDir: string;
   artifactDir?: string;
   server: NonNullable<Config['server']>,
+  includeSnapshots: boolean;
+  maxSnapshotTokens: number;
+  differentialSnapshots: boolean;
 };
 
 export async function resolveConfig(config: Config): Promise<FullConfig> {
@@ -200,6 +209,9 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
     outputDir: cliOptions.outputDir,
     artifactDir: cliOptions.artifactDir,
     imageResponses: cliOptions.imageResponses,
+    includeSnapshots: cliOptions.includeSnapshots,
+    maxSnapshotTokens: cliOptions.maxSnapshotTokens,
+    differentialSnapshots: cliOptions.differentialSnapshots,
   };
 
   return result;
@@ -223,6 +235,9 @@ function configFromEnv(): Config {
   options.isolated = envToBoolean(process.env.PLAYWRIGHT_MCP_ISOLATED);
   if (process.env.PLAYWRIGHT_MCP_IMAGE_RESPONSES === 'omit')
     options.imageResponses = 'omit';
+  options.includeSnapshots = envToBoolean(process.env.PLAYWRIGHT_MCP_INCLUDE_SNAPSHOTS);
+  options.maxSnapshotTokens = envToNumber(process.env.PLAYWRIGHT_MCP_MAX_SNAPSHOT_TOKENS);
+  options.differentialSnapshots = envToBoolean(process.env.PLAYWRIGHT_MCP_DIFFERENTIAL_SNAPSHOTS);
   options.sandbox = envToBoolean(process.env.PLAYWRIGHT_MCP_SANDBOX);
   options.outputDir = envToString(process.env.PLAYWRIGHT_MCP_OUTPUT_DIR);
   options.port = envToNumber(process.env.PLAYWRIGHT_MCP_PORT);

@@ -27,7 +27,7 @@ const pressKey = defineTabTool({
   schema: {
     name: 'browser_press_key',
     title: 'Press a key',
-    description: 'Press a key on the keyboard',
+    description: 'Press a key on the keyboard. Returns page snapshot after keypress unless disabled with --no-snapshots.',
     inputSchema: z.object({
       key: z.string().describe('Name of the key to press or a character to generate, such as `ArrowLeft` or `a`'),
     }),
@@ -56,7 +56,7 @@ const type = defineTabTool({
   schema: {
     name: 'browser_type',
     title: 'Type text',
-    description: 'Type text into editable element',
+    description: 'Type text into editable element. Returns page snapshot after typing unless disabled with --no-snapshots.',
     inputSchema: typeSchema,
     type: 'destructive',
   },

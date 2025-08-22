@@ -23,7 +23,7 @@ const navigate = defineTool({
   schema: {
     name: 'browser_navigate',
     title: 'Navigate to a URL',
-    description: 'Navigate to a URL',
+    description: 'Navigate to a URL. Returns page snapshot after navigation unless disabled with --no-snapshots.',
     inputSchema: z.object({
       url: z.string().describe('The URL to navigate to'),
     }),
