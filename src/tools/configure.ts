@@ -74,6 +74,12 @@ const installPopularExtensionSchema = z.object({
   version: z.string().optional().describe('Specific version to install (defaults to latest)')
 });
 
+const configureSnapshotsSchema = z.object({
+  includeSnapshots: z.boolean().optional().describe('Enable/disable automatic snapshots after interactive operations. When false, use browser_snapshot for explicit snapshots.'),
+  maxSnapshotTokens: z.number().min(0).optional().describe('Maximum tokens allowed in snapshots before truncation. Use 0 to disable truncation.'),
+  differentialSnapshots: z.boolean().optional().describe('Enable differential snapshots that show only changes since last snapshot instead of full page snapshots.')
+});
+
 export default [
   defineTool({
     capability: 'core',
@@ -521,6 +527,78 @@ export default [
 
       } catch (error) {
         throw new Error(`Failed to install popular extension: ${error}`);
+      }
+    },
+  }),
+  defineTool({
+    capability: 'core',
+    schema: {
+      name: 'browser_configure_snapshots',
+      title: 'Configure snapshot behavior',
+      description: 'Configure how page snapshots are handled during the session. Control automatic snapshots, size limits, and differential modes. Changes take effect immediately for subsequent tool calls.',
+      inputSchema: configureSnapshotsSchema,
+      type: 'destructive',
+    },
+    handle: async (context: Context, params: z.output<typeof configureSnapshotsSchema>, response: Response) => {
+      try {
+        const changes: string[] = [];
+
+        // Update snapshot configuration
+        if (params.includeSnapshots !== undefined)
+          changes.push(`📸 Auto-snapshots: ${params.includeSnapshots ? 'enabled' : 'disabled'}`);
+
+
+        if (params.maxSnapshotTokens !== undefined) {
+          if (params.maxSnapshotTokens === 0)
+            changes.push(`📏 Snapshot truncation: disabled (unlimited size)`);
+          else
+            changes.push(`📏 Max snapshot tokens: ${params.maxSnapshotTokens.toLocaleString()}`);
+
+        }
+
+        if (params.differentialSnapshots !== undefined) {
+          changes.push(`🔄 Differential snapshots: ${params.differentialSnapshots ? 'enabled' : 'disabled'}`);
+
+          if (params.differentialSnapshots)
+            changes.push(`   ↳ Reset differential state for fresh tracking`);
+
+        }
+
+        // Apply the updated configuration using the context method
+        context.updateSnapshotConfig(params);
+
+        // Provide user feedback
+        if (changes.length === 0) {
+          response.addResult('No snapshot configuration changes specified.\n\n**Current settings:**\n' +
+            `📸 Auto-snapshots: ${context.config.includeSnapshots ? 'enabled' : 'disabled'}\n` +
+            `📏 Max snapshot tokens: ${context.config.maxSnapshotTokens === 0 ? 'unlimited' : context.config.maxSnapshotTokens.toLocaleString()}\n` +
+            `🔄 Differential snapshots: ${context.config.differentialSnapshots ? 'enabled' : 'disabled'}`);
+          return;
+        }
+
+        let result = '✅ **Snapshot configuration updated:**\n\n';
+        result += changes.map(change => `- ${change}`).join('\n');
+        result += '\n\n**💡 Tips:**\n';
+
+        if (!context.config.includeSnapshots)
+          result += '- Use `browser_snapshot` tool when you need explicit page snapshots\n';
+
+
+        if (context.config.differentialSnapshots) {
+          result += '- Differential mode shows only changes between operations\n';
+          result += '- First snapshot after enabling will establish baseline\n';
+        }
+
+        if (context.config.maxSnapshotTokens > 0 && context.config.maxSnapshotTokens < 5000)
+          result += '- Consider increasing token limit if snapshots are frequently truncated\n';
+
+
+        result += '\n**Changes take effect immediately for subsequent tool calls.**';
+
+        response.addResult(result);
+
+      } catch (error) {
+        throw new Error(`Failed to configure snapshots: ${error}`);
       }
     },
   }),

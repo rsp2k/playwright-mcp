@@ -636,4 +636,28 @@ export class Context {
     this._lastSnapshotFingerprint = undefined;
     this._lastPageState = undefined;
   }
+
+  updateSnapshotConfig(updates: {
+    includeSnapshots?: boolean;
+    maxSnapshotTokens?: number;
+    differentialSnapshots?: boolean;
+  }): void {
+    // Update configuration at runtime
+    if (updates.includeSnapshots !== undefined)
+      (this.config as any).includeSnapshots = updates.includeSnapshots;
+
+
+    if (updates.maxSnapshotTokens !== undefined)
+      (this.config as any).maxSnapshotTokens = updates.maxSnapshotTokens;
+
+
+    if (updates.differentialSnapshots !== undefined) {
+      (this.config as any).differentialSnapshots = updates.differentialSnapshots;
+
+      // Reset differential state when toggling
+      if (updates.differentialSnapshots)
+        this.resetDifferentialSnapshot();
+
+    }
+  }
 }

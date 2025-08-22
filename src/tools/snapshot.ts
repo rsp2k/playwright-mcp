@@ -25,7 +25,7 @@ const snapshot = defineTool({
   schema: {
     name: 'browser_snapshot',
     title: 'Page snapshot',
-    description: 'Capture complete accessibility snapshot of the current page. Always returns full snapshot regardless of --no-snapshots or size limits. Better than screenshot for understanding page structure.',
+    description: 'Capture complete accessibility snapshot of the current page. Always returns full snapshot regardless of session snapshot configuration. Better than screenshot for understanding page structure.',
     inputSchema: z.object({}),
     type: 'readOnly',
   },
@@ -51,7 +51,7 @@ const click = defineTabTool({
   schema: {
     name: 'browser_click',
     title: 'Click',
-    description: 'Perform click on a web page. Returns page snapshot after click unless disabled with --no-snapshots. Large snapshots (>10k tokens) are truncated - use browser_snapshot for full capture.',
+    description: 'Perform click on a web page. Returns page snapshot after click (configurable via browser_configure_snapshots). Use browser_snapshot for explicit full snapshots.',
     inputSchema: clickSchema,
     type: 'destructive',
   },
@@ -85,7 +85,7 @@ const drag = defineTabTool({
   schema: {
     name: 'browser_drag',
     title: 'Drag mouse',
-    description: 'Perform drag and drop between two elements. Returns page snapshot after drag unless disabled with --no-snapshots.',
+    description: 'Perform drag and drop between two elements. Returns page snapshot after drag (configurable via browser_configure_snapshots).',
     inputSchema: z.object({
       startElement: z.string().describe('Human-readable source element description used to obtain the permission to interact with the element'),
       startRef: z.string().describe('Exact source element reference from the page snapshot'),
@@ -116,7 +116,7 @@ const hover = defineTabTool({
   schema: {
     name: 'browser_hover',
     title: 'Hover mouse',
-    description: 'Hover over element on page. Returns page snapshot after hover unless disabled with --no-snapshots.',
+    description: 'Hover over element on page. Returns page snapshot after hover (configurable via browser_configure_snapshots).',
     inputSchema: elementSchema,
     type: 'readOnly',
   },
@@ -142,7 +142,7 @@ const selectOption = defineTabTool({
   schema: {
     name: 'browser_select_option',
     title: 'Select option',
-    description: 'Select an option in a dropdown. Returns page snapshot after selection unless disabled with --no-snapshots.',
+    description: 'Select an option in a dropdown. Returns page snapshot after selection (configurable via browser_configure_snapshots).',
     inputSchema: selectOptionSchema,
     type: 'destructive',
   },
