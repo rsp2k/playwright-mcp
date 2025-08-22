@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "React Developer Tools (Demo)",
+  "version": "5.0.0",
+  "description": "Demo version of React Developer Tools - adds React DevTools functionality",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["inject.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "devtools_page": "devtools.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["hook.js"],
+      "matches": ["*://*/*"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "React DevTools"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
