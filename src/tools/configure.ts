@@ -77,7 +77,8 @@ const installPopularExtensionSchema = z.object({
 const configureSnapshotsSchema = z.object({
   includeSnapshots: z.boolean().optional().describe('Enable/disable automatic snapshots after interactive operations. When false, use browser_snapshot for explicit snapshots.'),
   maxSnapshotTokens: z.number().min(0).optional().describe('Maximum tokens allowed in snapshots before truncation. Use 0 to disable truncation.'),
-  differentialSnapshots: z.boolean().optional().describe('Enable differential snapshots that show only changes since last snapshot instead of full page snapshots.')
+  differentialSnapshots: z.boolean().optional().describe('Enable differential snapshots that show only changes since last snapshot instead of full page snapshots.'),
+  consoleOutputFile: z.string().optional().describe('File path to write browser console output to. Set to empty string to disable console file output.')
 });
 
 export default [
@@ -564,6 +565,14 @@ export default [
 
         }
 
+        if (params.consoleOutputFile !== undefined) {
+          if (params.consoleOutputFile === '')
+            changes.push(`📝 Console output file: disabled`);
+          else
+            changes.push(`📝 Console output file: ${params.consoleOutputFile}`);
+
+        }
+
         // Apply the updated configuration using the context method
         context.updateSnapshotConfig(params);
 
@@ -572,7 +581,8 @@ export default [
           response.addResult('No snapshot configuration changes specified.\n\n**Current settings:**\n' +
             `📸 Auto-snapshots: ${context.config.includeSnapshots ? 'enabled' : 'disabled'}\n` +
             `📏 Max snapshot tokens: ${context.config.maxSnapshotTokens === 0 ? 'unlimited' : context.config.maxSnapshotTokens.toLocaleString()}\n` +
-            `🔄 Differential snapshots: ${context.config.differentialSnapshots ? 'enabled' : 'disabled'}`);
+            `🔄 Differential snapshots: ${context.config.differentialSnapshots ? 'enabled' : 'disabled'}\n` +
+            `📝 Console output file: ${context.config.consoleOutputFile || 'disabled'}`);
           return;
         }
 

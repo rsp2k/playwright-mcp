@@ -31,6 +31,7 @@ export type CLIOptions = {
   caps?: string[];
   cdpEndpoint?: string;
   config?: string;
+  consoleOutputFile?: string;
   device?: string;
   executablePath?: string;
   headless?: boolean;
@@ -93,6 +94,7 @@ export type FullConfig = Config & {
   includeSnapshots: boolean;
   maxSnapshotTokens: number;
   differentialSnapshots: boolean;
+  consoleOutputFile?: string;
 };
 
 export async function resolveConfig(config: Config): Promise<FullConfig> {
@@ -212,6 +214,7 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
     includeSnapshots: cliOptions.includeSnapshots,
     maxSnapshotTokens: cliOptions.maxSnapshotTokens,
     differentialSnapshots: cliOptions.differentialSnapshots,
+    consoleOutputFile: cliOptions.consoleOutputFile,
   };
 
   return result;
@@ -238,6 +241,7 @@ function configFromEnv(): Config {
   options.includeSnapshots = envToBoolean(process.env.PLAYWRIGHT_MCP_INCLUDE_SNAPSHOTS);
   options.maxSnapshotTokens = envToNumber(process.env.PLAYWRIGHT_MCP_MAX_SNAPSHOT_TOKENS);
   options.differentialSnapshots = envToBoolean(process.env.PLAYWRIGHT_MCP_DIFFERENTIAL_SNAPSHOTS);
+  options.consoleOutputFile = envToString(process.env.PLAYWRIGHT_MCP_CONSOLE_OUTPUT_FILE);
   options.sandbox = envToBoolean(process.env.PLAYWRIGHT_MCP_SANDBOX);
   options.outputDir = envToString(process.env.PLAYWRIGHT_MCP_OUTPUT_DIR);
   options.port = envToNumber(process.env.PLAYWRIGHT_MCP_PORT);

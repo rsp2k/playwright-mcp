@@ -143,4 +143,11 @@ export type Config = {
    * Default is false.
    */
   differentialSnapshots?: boolean;
+
+  /**
+   * File path to write browser console output to. When specified, all console
+   * messages from browser pages will be written to this file in real-time.
+   * Useful for debugging and monitoring browser activity.
+   */
+  consoleOutputFile?: string;
 };

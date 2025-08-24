@@ -641,6 +641,7 @@ export class Context {
     includeSnapshots?: boolean;
     maxSnapshotTokens?: number;
     differentialSnapshots?: boolean;
+    consoleOutputFile?: string;
   }): void {
     // Update configuration at runtime
     if (updates.includeSnapshots !== undefined)
@@ -659,5 +660,9 @@ export class Context {
         this.resetDifferentialSnapshot();
 
     }
+
+    if (updates.consoleOutputFile !== undefined)
+      (this.config as any).consoleOutputFile = updates.consoleOutputFile === '' ? undefined : updates.consoleOutputFile;
+
   }
 }

@@ -15,6 +15,8 @@
  */
 
 import { EventEmitter } from 'events';
+import fs from 'fs';
+import path from 'path';
 import * as playwright from 'playwright';
 import { callOnPageNoTrace, waitForCompletion } from './tools/utils.js';
 import { logUnhandledError } from './log.js';
@@ -123,6 +125,39 @@ export class Tab extends EventEmitter<TabEventsInterface> {
   private _handleConsoleMessage(message: ConsoleMessage) {
     this._consoleMessages.push(message);
     this._recentConsoleMessages.push(message);
+
+    // Write to console output file if configured
+    if (this.context.config.consoleOutputFile)
+      this._writeConsoleToFile(message);
+
+  }
+
+  private _writeConsoleToFile(message: ConsoleMessage) {
+    try {
+      const consoleFile = this.context.config.consoleOutputFile!;
+      const timestamp = new Date().toISOString();
+      const url = this.page.url();
+      const sessionId = this.context.sessionId;
+
+      const logEntry = `[${timestamp}] [${sessionId}] [${url}] ${message.toString()}\n`;
+
+      // Ensure directory exists
+      const dir = path.dirname(consoleFile);
+      if (!fs.existsSync(dir))
+        fs.mkdirSync(dir, { recursive: true });
+
+
+      // Append to file (async to avoid blocking)
+      fs.appendFile(consoleFile, logEntry, err => {
+        if (err) {
+          // Log error but don't fail the operation
+          logUnhandledError(err);
+        }
+      });
+    } catch (error) {
+      // Silently handle errors to avoid breaking browser functionality
+      logUnhandledError(error);
+    }
   }
 
   private _onClose() {
