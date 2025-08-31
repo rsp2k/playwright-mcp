@@ -60,7 +60,6 @@ const defaultConfig: FullConfig = {
     browserName: 'chromium',
     isolated: true,
     launchOptions: {
-      channel: 'chrome',
       headless: false,
       chromiumSandbox: true,
     },

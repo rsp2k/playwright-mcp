@@ -160,6 +160,8 @@ Playwright MCP server supports following arguments. They can be provided in the 
                                   vision, pdf.
   --cdp-endpoint <endpoint>       CDP endpoint to connect to.
   --config <path>                 path to the configuration file.
+  --console-output-file <path>    file path to write browser console output to
+                                  for debugging and monitoring.
   --device <device>               device to emulate, for example: "iPhone 15"
   --executable-path <path>        path to the browser executable.
   --headless                      run browser in headless mode, headed by
@@ -529,7 +531,7 @@ http.createServer(async (req, res) => {
 
 - **browser_click**
   - Title: Click
-  - Description: Perform click on a web page. Returns page snapshot after click unless disabled with --no-snapshots. Large snapshots (>10k tokens) are truncated - use browser_snapshot for full capture.
+  - Description: Perform click on a web page. Returns page snapshot after click (configurable via browser_configure_snapshots). Use browser_snapshot for explicit full snapshots.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -575,6 +577,18 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_configure_snapshots**
+  - Title: Configure snapshot behavior
+  - Description: Configure how page snapshots are handled during the session. Control automatic snapshots, size limits, and differential modes. Changes take effect immediately for subsequent tool calls.
+  - Parameters:
+    - `includeSnapshots` (boolean, optional): Enable/disable automatic snapshots after interactive operations. When false, use browser_snapshot for explicit snapshots.
+    - `maxSnapshotTokens` (number, optional): Maximum tokens allowed in snapshots before truncation. Use 0 to disable truncation.
+    - `differentialSnapshots` (boolean, optional): Enable differential snapshots that show only changes since last snapshot instead of full page snapshots.
+    - `consoleOutputFile` (string, optional): File path to write browser console output to. Set to empty string to disable console file output.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_console_messages**
   - Title: Get console messages
   - Description: Returns all console messages
@@ -585,7 +599,7 @@ http.createServer(async (req, res) => {
 
 - **browser_drag**
   - Title: Drag mouse
-  - Description: Perform drag and drop between two elements. Returns page snapshot after drag unless disabled with --no-snapshots.
+  - Description: Perform drag and drop between two elements. Returns page snapshot after drag (configurable via browser_configure_snapshots).
   - Parameters:
     - `startElement` (string): Human-readable source element description used to obtain the permission to interact with the element
     - `startRef` (string): Exact source element reference from the page snapshot
@@ -597,7 +611,7 @@ http.createServer(async (req, res) => {
 
 - **browser_evaluate**
   - Title: Evaluate JavaScript
-  - Description: Evaluate JavaScript expression on page or element
+  - Description: Evaluate JavaScript expression on page or element. Returns page snapshot after evaluation (configurable via browser_configure_snapshots).
   - Parameters:
     - `function` (string): () => { /* code */ } or (element) => { /* code */ } when element is provided
     - `element` (string, optional): Human-readable element description used to obtain permission to interact with the element
@@ -608,7 +622,7 @@ http.createServer(async (req, res) => {
 
 - **browser_file_upload**
   - Title: Upload files
-  - Description: Upload one or multiple files
+  - Description: Upload one or multiple files. Returns page snapshot after upload (configurable via browser_configure_snapshots).
   - Parameters:
     - `paths` (array): The absolute paths to the files to upload. Can be a single file or multiple files.
   - Read-only: **false**
@@ -617,7 +631,7 @@ http.createServer(async (req, res) => {
 
 - **browser_handle_dialog**
   - Title: Handle a dialog
-  - Description: Handle a dialog
+  - Description: Handle a dialog. Returns page snapshot after handling dialog (configurable via browser_configure_snapshots).
   - Parameters:
     - `accept` (boolean): Whether to accept the dialog.
     - `promptText` (string, optional): The text of the prompt in case of a prompt dialog.
@@ -627,7 +641,7 @@ http.createServer(async (req, res) => {
 
 - **browser_hover**
   - Title: Hover mouse
-  - Description: Hover over element on page. Returns page snapshot after hover unless disabled with --no-snapshots.
+  - Description: Hover over element on page. Returns page snapshot after hover (configurable via browser_configure_snapshots).
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -673,7 +687,7 @@ http.createServer(async (req, res) => {
 
 - **browser_navigate**
   - Title: Navigate to a URL
-  - Description: Navigate to a URL. Returns page snapshot after navigation unless disabled with --no-snapshots.
+  - Description: Navigate to a URL. Returns page snapshot after navigation (configurable via browser_configure_snapshots).
   - Parameters:
     - `url` (string): The URL to navigate to
   - Read-only: **false**
@@ -706,7 +720,7 @@ http.createServer(async (req, res) => {
 
 - **browser_press_key**
   - Title: Press a key
-  - Description: Press a key on the keyboard. Returns page snapshot after keypress unless disabled with --no-snapshots.
+  - Description: Press a key on the keyboard. Returns page snapshot after keypress (configurable via browser_configure_snapshots).
   - Parameters:
     - `key` (string): Name of the key to press or a character to generate, such as `ArrowLeft` or `a`
   - Read-only: **false**
@@ -733,7 +747,7 @@ http.createServer(async (req, res) => {
 
 - **browser_select_option**
   - Title: Select option
-  - Description: Select an option in a dropdown. Returns page snapshot after selection unless disabled with --no-snapshots.
+  - Description: Select an option in a dropdown. Returns page snapshot after selection (configurable via browser_configure_snapshots).
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -744,7 +758,7 @@ http.createServer(async (req, res) => {
 
 - **browser_snapshot**
   - Title: Page snapshot
-  - Description: Capture complete accessibility snapshot of the current page. Always returns full snapshot regardless of --no-snapshots or size limits. Better than screenshot for understanding page structure.
+  - Description: Capture complete accessibility snapshot of the current page. Always returns full snapshot regardless of session snapshot configuration. Better than screenshot for understanding page structure.
   - Parameters: None
   - Read-only: **true**
 
@@ -770,20 +784,21 @@ http.createServer(async (req, res) => {
 
 - **browser_take_screenshot**
   - Title: Take a screenshot
-  - Description: Take a screenshot of the current page. You can't perform actions based on the screenshot, use browser_snapshot for actions.
+  - Description: Take a screenshot of the current page. Images exceeding 8000 pixels in either dimension will be rejected unless allowLargeImages=true. You can't perform actions based on the screenshot, use browser_snapshot for actions.
   - Parameters:
     - `raw` (boolean, optional): Whether to return without compression (in PNG format). Default is false, which returns a JPEG image.
     - `filename` (string, optional): File name to save the screenshot to. Defaults to `page-{timestamp}.{png|jpeg}` if not specified.
     - `element` (string, optional): Human-readable element description used to obtain permission to screenshot the element. If not provided, the screenshot will be taken of viewport. If element is provided, ref must be provided too.
     - `ref` (string, optional): Exact target element reference from the page snapshot. If not provided, the screenshot will be taken of viewport. If ref is provided, element must be provided too.
     - `fullPage` (boolean, optional): When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Cannot be used with element screenshots.
+    - `allowLargeImages` (boolean, optional): Allow images with dimensions exceeding 8000 pixels (API limit). Default false - will error if image is too large to prevent API failures.
   - Read-only: **true**
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
 - **browser_type**
   - Title: Type text
-  - Description: Type text into editable element. Returns page snapshot after typing unless disabled with --no-snapshots.
+  - Description: Type text into editable element. Returns page snapshot after typing (configurable via browser_configure_snapshots).
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -805,7 +820,7 @@ http.createServer(async (req, res) => {
 
 - **browser_wait_for**
   - Title: Wait for
-  - Description: Wait for text to appear or disappear or a specified time to pass
+  - Description: Wait for text to appear or disappear or a specified time to pass. Returns page snapshot after waiting (configurable via browser_configure_snapshots).
   - Parameters:
     - `time` (number, optional): The time to wait in seconds
     - `text` (string, optional): The text to wait for
@@ -821,7 +836,7 @@ http.createServer(async (req, res) => {
 
 - **browser_tab_close**
   - Title: Close a tab
-  - Description: Close a tab
+  - Description: Close a tab. Returns page snapshot after closing tab (configurable via browser_configure_snapshots).
   - Parameters:
     - `index` (number, optional): The index of the tab to close. Closes current tab if not provided.
   - Read-only: **false**
@@ -838,7 +853,7 @@ http.createServer(async (req, res) => {
 
 - **browser_tab_new**
   - Title: Open a new tab
-  - Description: Open a new tab
+  - Description: Open a new tab. Returns page snapshot after opening tab (configurable via browser_configure_snapshots).
   - Parameters:
     - `url` (string, optional): The URL to navigate to in the new tab. If not provided, the new tab will be blank.
   - Read-only: **true**
@@ -847,7 +862,7 @@ http.createServer(async (req, res) => {
 
 - **browser_tab_select**
   - Title: Select a tab
-  - Description: Select a tab by index
+  - Description: Select a tab by index. Returns page snapshot after selecting tab (configurable via browser_configure_snapshots).
   - Parameters:
     - `index` (number): The index of the tab to select
   - Read-only: **true**

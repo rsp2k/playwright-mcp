@@ -37,7 +37,8 @@ const configureSchema = z.object({
   locale: z.string().optional().describe('Browser locale (e.g., "en-US", "fr-FR", "ja-JP")'),
   timezone: z.string().optional().describe('Timezone ID (e.g., "America/New_York", "Europe/London", "Asia/Tokyo")'),
   colorScheme: z.enum(['light', 'dark', 'no-preference']).optional().describe('Preferred color scheme'),
-  permissions: z.array(z.string()).optional().describe('Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])')
+  permissions: z.array(z.string()).optional().describe('Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])'),
+  offline: z.boolean().optional().describe('Whether to emulate offline network conditions (equivalent to DevTools offline mode)')
 });
 
 const listDevicesSchema = z.object({});
@@ -79,6 +80,43 @@ const configureSnapshotsSchema = z.object({
   maxSnapshotTokens: z.number().min(0).optional().describe('Maximum tokens allowed in snapshots before truncation. Use 0 to disable truncation.'),
   differentialSnapshots: z.boolean().optional().describe('Enable differential snapshots that show only changes since last snapshot instead of full page snapshots.'),
   consoleOutputFile: z.string().optional().describe('File path to write browser console output to. Set to empty string to disable console file output.')
+});
+
+// Simple offline mode toggle for testing
+const offlineModeSchema = z.object({
+  offline: z.boolean().describe('Whether to enable offline mode (true) or online mode (false)')
+});
+
+const offlineModeTest = defineTool({
+  capability: 'core',
+  schema: {
+    name: 'browser_set_offline',
+    title: 'Set browser offline mode',
+    description: 'Toggle browser offline mode on/off (equivalent to DevTools offline checkbox)',
+    inputSchema: offlineModeSchema,
+    type: 'destructive',
+  },
+  handle: async (context: Context, params: z.output<typeof offlineModeSchema>, response: Response) => {
+    try {
+      // Get current browser context
+      const tab = context.currentTab();
+      if (!tab) {
+        throw new Error('No active browser tab. Navigate to a page first.');
+      }
+      
+      const browserContext = tab.page.context();
+      await browserContext.setOffline(params.offline);
+      
+      response.addResult(
+        `✅ Browser offline mode ${params.offline ? 'enabled' : 'disabled'}\n\n` +
+        `The browser will now ${params.offline ? 'block all network requests' : 'allow network requests'} ` +
+        `(equivalent to ${params.offline ? 'checking' : 'unchecking'} the offline checkbox in DevTools).`
+      );
+      
+    } catch (error) {
+      throw new Error(`Failed to set offline mode: ${error}`);
+    }
+  },
 });
 
 export default [
@@ -197,6 +235,14 @@ export default [
           changes.push(`permissions: ${params.permissions.join(', ')}`);
 
 
+        if (params.offline !== undefined) {
+          const currentOffline = (currentConfig.browser as any).offline;
+          if (params.offline !== currentOffline)
+            changes.push(`offline mode: ${currentOffline ? 'enabled' : 'disabled'} → ${params.offline ? 'enabled' : 'disabled'}`);
+
+        }
+
+
         if (changes.length === 0) {
           response.addResult('No configuration changes detected. Current settings remain the same.');
           return;
@@ -213,6 +259,7 @@ export default [
           timezone: params.timezone,
           colorScheme: params.colorScheme,
           permissions: params.permissions,
+          offline: params.offline,
         });
 
         response.addResult(`Browser configuration updated successfully:\n${changes.map(c => `• ${c}`).join('\n')}\n\nThe browser has been restarted with the new settings.`);
@@ -398,7 +445,12 @@ export default [
           `Path: ${params.path}\n` +
           `Manifest version: ${manifest.manifest_version || 'unknown'}\n\n` +
           `The browser has been restarted with the extension loaded.\n` +
-          `Use browser_list_extensions to see all installed extensions.`
+          `Use browser_list_extensions to see all installed extensions.\n\n` +
+          `⚠️  **Extension Persistence**: Extensions are session-based and will need to be reinstalled if:\n` +
+          `• The MCP client disconnects and reconnects\n` +
+          `• The browser context is restarted\n` +
+          `• You switch between isolated/persistent browser modes\n\n` +
+          `Extensions remain active for the current session only.`
         );
 
       } catch (error) {
@@ -523,7 +575,12 @@ export default [
           `Version: ${extensionInfo.version}\n` +
           `Downloaded to: ${extensionDir}\n\n` +
           `The browser has been restarted with the extension loaded.\n` +
-          `Use browser_list_extensions to see all installed extensions.`
+          `Use browser_list_extensions to see all installed extensions.\n\n` +
+          `⚠️  **Extension Persistence**: Extensions are session-based and will need to be reinstalled if:\n` +
+          `• The MCP client disconnects and reconnects\n` +
+          `• The browser context is restarted\n` +
+          `• You switch between isolated/persistent browser modes\n\n` +
+          `Extensions remain active for the current session only.`
         );
 
       } catch (error) {
@@ -612,6 +669,7 @@ export default [
       }
     },
   }),
+  offlineModeTest,
 ];
 
 // Helper functions for extension downloading

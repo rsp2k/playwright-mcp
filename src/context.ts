@@ -315,6 +315,11 @@ export class Context {
 
     const browserContext = await browser.newContext(contextOptions);
 
+    // Apply offline mode if configured
+    if ((this.config as any).offline !== undefined) {
+      await browserContext.setOffline((this.config as any).offline);
+    }
+
     return {
       browserContext,
       close: async () => {
@@ -373,6 +378,7 @@ export class Context {
     timezone?: string;
     colorScheme?: 'light' | 'dark' | 'no-preference';
     permissions?: string[];
+    offline?: boolean;
   }): Promise<void> {
     const currentConfig = { ...this.config };
 
@@ -426,6 +432,10 @@ export class Context {
 
     if (changes.permissions)
       currentConfig.browser.contextOptions.permissions = changes.permissions;
+
+
+    if (changes.offline !== undefined)
+      (currentConfig.browser as any).offline = changes.offline;
 
 
     // Store the modified config

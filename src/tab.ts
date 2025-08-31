@@ -71,6 +71,12 @@ export class Tab extends EventEmitter<TabEventsInterface> {
     });
     page.setDefaultNavigationTimeout(60000);
     page.setDefaultTimeout(5000);
+
+    // Initialize service worker console capture
+    void this._initializeServiceWorkerConsoleCapture();
+    
+    // Initialize extension-based console capture
+    void this._initializeExtensionConsoleCapture();
   }
 
   modalStates(): ModalState[] {
@@ -156,6 +162,215 @@ export class Tab extends EventEmitter<TabEventsInterface> {
       });
     } catch (error) {
       // Silently handle errors to avoid breaking browser functionality
+      logUnhandledError(error);
+    }
+  }
+
+  private async _initializeServiceWorkerConsoleCapture() {
+    try {
+      // Only attempt CDP console capture for Chromium browsers
+      if (this.page.context().browser()?.browserType().name() !== 'chromium')
+        return;
+
+
+      const cdpSession = await this.page.context().newCDPSession(this.page);
+
+      // Enable runtime domain for console API calls
+      await cdpSession.send('Runtime.enable');
+      
+      // Enable network domain for network-related errors
+      await cdpSession.send('Network.enable');
+      
+      // Enable security domain for mixed content warnings
+      await cdpSession.send('Security.enable');
+      
+      // Enable log domain for browser log entries
+      await cdpSession.send('Log.enable');
+
+      // Listen for console API calls (includes service worker console messages)
+      cdpSession.on('Runtime.consoleAPICalled', (event: any) => {
+        this._handleServiceWorkerConsole(event);
+      });
+
+      // Listen for runtime exceptions (includes service worker errors)
+      cdpSession.on('Runtime.exceptionThrown', (event: any) => {
+        this._handleServiceWorkerException(event);
+      });
+      
+      // Listen for network failed events
+      cdpSession.on('Network.loadingFailed', (event: any) => {
+        this._handleNetworkError(event);
+      });
+      
+      // Listen for security state changes (mixed content)
+      cdpSession.on('Security.securityStateChanged', (event: any) => {
+        this._handleSecurityStateChange(event);
+      });
+      
+      // Listen for log entries (browser-level logs)
+      cdpSession.on('Log.entryAdded', (event: any) => {
+        this._handleLogEntry(event);
+      });
+
+    } catch (error) {
+      // Silently handle CDP errors - not all contexts support CDP
+      logUnhandledError(error);
+    }
+  }
+
+  private _handleServiceWorkerConsole(event: any) {
+    try {
+      // Check if this console event is from a service worker context
+      if (event.executionContextId && event.args && event.args.length > 0) {
+        const message = event.args.map((arg: any) => {
+          if (arg.value !== undefined)
+            return String(arg.value);
+
+          if (arg.unserializableValue)
+            return arg.unserializableValue;
+
+          if (arg.objectId)
+            return '[object]';
+
+          return '';
+        }).join(' ');
+
+        const location = `service-worker:${event.stackTrace?.callFrames?.[0]?.lineNumber || 0}`;
+
+        const consoleMessage: ConsoleMessage = {
+          type: event.type || 'log',
+          text: message,
+          toString: () => `[${(event.type || 'log').toUpperCase()}] ${message} @ ${location}`,
+        };
+
+        this._handleConsoleMessage(consoleMessage);
+      }
+    } catch (error) {
+      logUnhandledError(error);
+    }
+  }
+
+  private _handleServiceWorkerException(event: any) {
+    try {
+      const exception = event.exceptionDetails;
+      if (exception) {
+        const text = exception.text || exception.exception?.description || 'Service Worker Exception';
+        const location = `service-worker:${exception.lineNumber || 0}`;
+
+        const consoleMessage: ConsoleMessage = {
+          type: 'error',
+          text: text,
+          toString: () => `[ERROR] ${text} @ ${location}`,
+        };
+
+        this._handleConsoleMessage(consoleMessage);
+      }
+    } catch (error) {
+      logUnhandledError(error);
+    }
+  }
+
+  private _handleNetworkError(event: any) {
+    try {
+      if (event.errorText && event.requestId) {
+        const consoleMessage: ConsoleMessage = {
+          type: 'error',
+          text: `Network Error: ${event.errorText} (${event.type || 'unknown'})`,
+          toString: () => `[NETWORK ERROR] ${event.errorText} @ ${event.type || 'network'}`,
+        };
+
+        this._handleConsoleMessage(consoleMessage);
+      }
+    } catch (error) {
+      logUnhandledError(error);
+    }
+  }
+
+  private _handleSecurityStateChange(event: any) {
+    try {
+      if (event.securityState === 'insecure' && event.explanations) {
+        for (const explanation of event.explanations) {
+          if (explanation.description && explanation.description.includes('mixed content')) {
+            const consoleMessage: ConsoleMessage = {
+              type: 'error',
+              text: `Security Warning: ${explanation.description}`,
+              toString: () => `[SECURITY] ${explanation.description} @ security-layer`,
+            };
+
+            this._handleConsoleMessage(consoleMessage);
+          }
+        }
+      }
+    } catch (error) {
+      logUnhandledError(error);
+    }
+  }
+
+  private _handleLogEntry(event: any) {
+    try {
+      const entry = event.entry;
+      if (entry && entry.text) {
+        const consoleMessage: ConsoleMessage = {
+          type: entry.level || 'info',
+          text: entry.text,
+          toString: () => `[${(entry.level || 'info').toUpperCase()}] ${entry.text} @ browser-log`,
+        };
+
+        this._handleConsoleMessage(consoleMessage);
+      }
+    } catch (error) {
+      logUnhandledError(error);
+    }
+  }
+
+  private async _initializeExtensionConsoleCapture() {
+    try {
+      // Listen for console messages from the extension
+      await this.page.evaluate(() => {
+        window.addEventListener('message', (event) => {
+          if (event.data && event.data.type === 'PLAYWRIGHT_CONSOLE_CAPTURE') {
+            const message = event.data.consoleMessage;
+            
+            // Store the message in a global array for Playwright to access
+            if (!(window as any)._playwrightExtensionConsoleMessages) {
+              (window as any)._playwrightExtensionConsoleMessages = [];
+            }
+            (window as any)._playwrightExtensionConsoleMessages.push(message);
+          }
+        });
+      });
+
+      // Poll for new extension console messages
+      setInterval(() => {
+        this._checkForExtensionConsoleMessages();
+      }, 1000);
+
+    } catch (error) {
+      logUnhandledError(error);
+    }
+  }
+
+  private async _checkForExtensionConsoleMessages() {
+    try {
+      const newMessages = await this.page.evaluate(() => {
+        if (!(window as any)._playwrightExtensionConsoleMessages) {
+          return [];
+        }
+        const messages = (window as any)._playwrightExtensionConsoleMessages;
+        (window as any)._playwrightExtensionConsoleMessages = [];
+        return messages;
+      });
+
+      for (const message of newMessages) {
+        const consoleMessage: ConsoleMessage = {
+          type: message.type || 'log',
+          text: message.text || '',
+          toString: () => `[${(message.type || 'log').toUpperCase()}] ${message.text} @ ${message.location || message.source}`,
+        };
+
+        this._handleConsoleMessage(consoleMessage);
+      }
+    } catch (error) {
       logUnhandledError(error);
     }
   }
