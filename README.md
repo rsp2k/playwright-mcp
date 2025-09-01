@@ -562,6 +562,7 @@ http.createServer(async (req, res) => {
     - `timezone` (string, optional): Timezone ID (e.g., "America/New_York", "Europe/London", "Asia/Tokyo")
     - `colorScheme` (string, optional): Preferred color scheme
     - `permissions` (array, optional): Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])
+    - `offline` (boolean, optional): Whether to emulate offline network conditions (equivalent to DevTools offline mode)
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -752,6 +753,15 @@ http.createServer(async (req, res) => {
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
     - `values` (array): Array of values to select in the dropdown. This can be a single value or multiple values.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_set_offline**
+  - Title: Set browser offline mode
+  - Description: Toggle browser offline mode on/off (equivalent to DevTools offline checkbox)
+  - Parameters:
+    - `offline` (boolean): Whether to enable offline mode (true) or online mode (false)
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
