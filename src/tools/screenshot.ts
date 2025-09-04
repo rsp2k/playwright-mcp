@@ -62,7 +62,7 @@ const screenshotSchema = z.object({
   filename: z.string().optional().describe('File name to save the screenshot to. Defaults to `page-{timestamp}.{png|jpeg}` if not specified.'),
   element: z.string().optional().describe('Human-readable element description used to obtain permission to screenshot the element. If not provided, the screenshot will be taken of viewport. If element is provided, ref must be provided too.'),
   ref: z.string().optional().describe('Exact target element reference from the page snapshot. If not provided, the screenshot will be taken of viewport. If ref is provided, element must be provided too.'),
-  fullPage: z.boolean().optional().describe('When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Cannot be used with element screenshots.'),
+  fullPage: z.boolean().optional().describe('When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Cannot be used with element screenshots. WARNING: Full page screenshots may exceed API size limits on long pages.'),
   allowLargeImages: z.boolean().optional().describe('Allow images with dimensions exceeding 8000 pixels (API limit). Default false - will error if image is too large to prevent API failures.'),
 }).refine(data => {
   return !!data.element === !!data.ref;
@@ -160,10 +160,29 @@ const screenshot = defineTabTool({
     }
 
     response.addResult(resultMessage);
-    response.addImage({
-      contentType: fileType === 'png' ? 'image/png' : 'image/jpeg',
-      data: buffer
-    });
+    
+    // Only add image to response if dimensions are safe or explicitly allowed
+    let addImageToResponse = true;
+    if (!params.allowLargeImages) {
+      try {
+        const { width, height } = getImageDimensions(buffer);
+        const maxDimension = 8000;
+        if (width > maxDimension || height > maxDimension) {
+          addImageToResponse = false;
+        }
+      } catch (dimensionError) {
+        // If we can't parse dimensions, continue and add the image
+      }
+    }
+    
+    if (addImageToResponse) {
+      response.addImage({
+        contentType: fileType === 'png' ? 'image/png' : 'image/jpeg',
+        data: buffer
+      });
+    } else {
+      response.addResult(`\n\n🚫 **Image not included in response**: Screenshot exceeds API size limits (8000px). Image saved to file only.`);
+    }
   }
 });
 
