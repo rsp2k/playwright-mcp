@@ -48,6 +48,70 @@ const uploadFile = defineTabTool({
   clearsModalState: 'fileChooser',
 });
 
+const dismissFileChooser = defineTabTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_dismiss_file_chooser',
+    title: 'Dismiss file chooser',
+    description: 'Dismiss/cancel a file chooser dialog without uploading files. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).',
+    inputSchema: z.object({
+      // No parameters needed - just dismiss the dialog
+    }),
+    type: 'destructive',
+  },
+
+  handle: async (tab, params, response) => {
+    response.setIncludeSnapshot();
+
+    const modalState = tab.modalStates().find(state => state.type === 'fileChooser');
+    if (!modalState)
+      throw new Error('No file chooser visible');
+
+    response.addCode(`// Cancel file chooser dialog`);
+    response.addCode(`// File chooser dismissed without selecting files`);
+
+    tab.clearModalState(modalState);
+    // The file chooser is automatically dismissed when we don't interact with it
+    // and just clear the modal state
+  },
+  clearsModalState: 'fileChooser',
+});
+
+const dismissAllFileChoosers = defineTabTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_dismiss_all_file_choosers',
+    title: 'Dismiss all file choosers',
+    description: 'Dismiss/cancel all open file chooser dialogs without uploading files. Useful when multiple file choosers are stuck open. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).',
+    inputSchema: z.object({
+      // No parameters needed
+    }),
+    type: 'destructive',
+  },
+
+  handle: async (tab, params, response) => {
+    response.setIncludeSnapshot();
+
+    const fileChooserStates = tab.modalStates().filter(state => state.type === 'fileChooser');
+    if (fileChooserStates.length === 0)
+      throw new Error('No file choosers visible');
+
+    response.addCode(`// Dismiss all ${fileChooserStates.length} file chooser dialogs`);
+
+    // Clear all file chooser modal states
+    for (const modalState of fileChooserStates) {
+      tab.clearModalState(modalState);
+    }
+    
+    response.addResult(`Dismissed ${fileChooserStates.length} file chooser dialog(s)`);
+  },
+  clearsModalState: 'fileChooser',
+});
+
 export default [
   uploadFile,
+  dismissFileChooser,
+  dismissAllFileChoosers,
 ];
