@@ -529,6 +529,14 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_clear_requests**
+  - Title: Clear captured requests
+  - Description: Clear all captured HTTP request data from memory. Useful for freeing up memory during long sessions or when starting fresh analysis.
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_click**
   - Title: Click
   - Description: Perform click on a web page. Returns page snapshot after click (configurable via browser_configure_snapshots). Use browser_snapshot for explicit full snapshots.
@@ -598,6 +606,22 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_dismiss_all_file_choosers**
+  - Title: Dismiss all file choosers
+  - Description: Dismiss/cancel all open file chooser dialogs without uploading files. Useful when multiple file choosers are stuck open. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_dismiss_file_chooser**
+  - Title: Dismiss file chooser
+  - Description: Dismiss/cancel a file chooser dialog without uploading files. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_drag**
   - Title: Drag mouse
   - Description: Perform drag and drop between two elements. Returns page snapshot after drag (configurable via browser_configure_snapshots).
@@ -621,12 +645,47 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_export_requests**
+  - Title: Export captured requests
+  - Description: Export captured HTTP requests to various formats (JSON, HAR, CSV, or summary report). Perfect for sharing analysis results, importing into other tools, or creating audit reports.
+  - Parameters:
+    - `format` (string, optional): Export format: json (full data), har (HTTP Archive), csv (spreadsheet), summary (human-readable report)
+    - `filename` (string, optional): Custom filename for export. Auto-generated if not specified with timestamp
+    - `filter` (string, optional): Filter which requests to export
+    - `includeBody` (boolean, optional): Include request/response bodies in export (warning: may create large files)
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_file_upload**
   - Title: Upload files
   - Description: Upload one or multiple files. Returns page snapshot after upload (configurable via browser_configure_snapshots).
   - Parameters:
     - `paths` (array): The absolute paths to the files to upload. Can be a single file or multiple files.
   - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_get_artifact_paths**
+  - Title: Get artifact storage paths
+  - Description: Reveal the actual filesystem paths where artifacts (screenshots, videos, PDFs) are stored. Useful for locating generated files.
+  - Parameters: None
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_get_requests**
+  - Title: Get captured requests
+  - Description: Retrieve and analyze captured HTTP requests with advanced filtering. Shows timing, status codes, headers, and bodies. Perfect for identifying performance issues, failed requests, or analyzing API usage patterns.
+  - Parameters:
+    - `filter` (string, optional): Filter requests by type: all, failed (network failures), slow (>1s), errors (4xx/5xx), success (2xx/3xx)
+    - `domain` (string, optional): Filter requests by domain hostname
+    - `method` (string, optional): Filter requests by HTTP method (GET, POST, etc.)
+    - `status` (number, optional): Filter requests by HTTP status code
+    - `limit` (number, optional): Maximum number of requests to return (default: 100)
+    - `format` (string, optional): Response format: summary (basic info), detailed (full data), stats (statistics only)
+    - `slowThreshold` (number, optional): Threshold in milliseconds for considering requests "slow" (default: 1000ms)
+  - Read-only: **true**
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
@@ -713,8 +772,9 @@ http.createServer(async (req, res) => {
 
 - **browser_network_requests**
   - Title: List network requests
-  - Description: Returns all network requests since loading the page
-  - Parameters: None
+  - Description: Returns all network requests since loading the page. For more detailed analysis including timing, headers, and bodies, use the advanced request monitoring tools (browser_start_request_monitoring, browser_get_requests).
+  - Parameters:
+    - `detailed` (boolean, optional): Show detailed request information if request monitoring is active
   - Read-only: **true**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -731,6 +791,14 @@ http.createServer(async (req, res) => {
 - **browser_recording_status**
   - Title: Get video recording status
   - Description: Check if video recording is currently enabled and get recording details. Use this to verify recording is active before performing actions, or to check output directory and settings.
+  - Parameters: None
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_request_monitoring_status**
+  - Title: Get request monitoring status
+  - Description: Check if request monitoring is active and view current configuration. Shows capture statistics, filter settings, and output paths.
   - Parameters: None
   - Read-only: **true**
 
@@ -784,6 +852,19 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_start_request_monitoring**
+  - Title: Start request monitoring
+  - Description: Enable comprehensive HTTP request/response interception and analysis. Captures headers, bodies, timing, and failure information for all browser traffic. Essential for security testing, API analysis, and performance debugging.
+  - Parameters:
+    - `urlFilter` (optional): Filter URLs to capture. Can be a string (contains match), regex pattern, or custom function. Examples: "/api/", ".*\.json$", or custom logic
+    - `captureBody` (boolean, optional): Whether to capture request and response bodies (default: true)
+    - `maxBodySize` (number, optional): Maximum body size to capture in bytes (default: 10MB). Larger bodies will be truncated
+    - `autoSave` (boolean, optional): Automatically save captured requests after each response (default: false for performance)
+    - `outputPath` (string, optional): Custom output directory path. If not specified, uses session artifact directory
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_stop_recording**
   - Title: Stop video recording
   - Description: Stop video recording and return the paths to recorded video files. This closes all active pages to ensure videos are properly saved. Call this when you want to finalize and access the recorded videos.
@@ -800,7 +881,7 @@ http.createServer(async (req, res) => {
     - `filename` (string, optional): File name to save the screenshot to. Defaults to `page-{timestamp}.{png|jpeg}` if not specified.
     - `element` (string, optional): Human-readable element description used to obtain permission to screenshot the element. If not provided, the screenshot will be taken of viewport. If element is provided, ref must be provided too.
     - `ref` (string, optional): Exact target element reference from the page snapshot. If not provided, the screenshot will be taken of viewport. If ref is provided, element must be provided too.
-    - `fullPage` (boolean, optional): When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Cannot be used with element screenshots.
+    - `fullPage` (boolean, optional): When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Cannot be used with element screenshots. WARNING: Full page screenshots may exceed API size limits on long pages.
     - `allowLargeImages` (boolean, optional): Allow images with dimensions exceeding 8000 pixels (API limit). Default false - will error if image is too large to prevent API failures.
   - Read-only: **true**
 

@@ -70,6 +70,20 @@ export class ArtifactManager {
   }
 
   /**
+   * Get the base directory for all artifacts
+   */
+  getBaseDirectory(): string {
+    return this._baseDir;
+  }
+
+  /**
+   * Get the session-specific directory
+   */
+  getSessionDirectory(): string {
+    return this._sessionDir;
+  }
+
+  /**
    * Create a subdirectory within the session directory
    */
   getSubdirectory(subdir: string): string {

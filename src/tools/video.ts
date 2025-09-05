@@ -130,6 +130,23 @@ const getRecordingStatus = defineTool({
       response.addResult('1. Use browser_start_recording to enable recording');
       response.addResult('2. Navigate to pages and perform actions');
       response.addResult('3. Use browser_stop_recording to save videos');
+      
+      // Show potential artifact locations for debugging
+      const registry = ArtifactManagerRegistry.getInstance();
+      const artifactManager = context.sessionId ? registry.getManager(context.sessionId) : undefined;
+      
+      if (artifactManager) {
+        const baseDir = artifactManager.getBaseDirectory();
+        const sessionDir = artifactManager.getSessionDirectory();
+        response.addResult(`\n🔍 Debug Info:`);
+        response.addResult(`📁 Artifact base directory: ${baseDir}`);
+        response.addResult(`📂 Session directory: ${sessionDir}`);
+        response.addResult(`🆔 Session ID: ${context.sessionId}`);
+      } else {
+        response.addResult(`\n⚠️  No artifact manager configured - videos will save to default output directory`);
+        response.addResult(`📁 Default output: ${path.join(context.config.outputDir, 'videos')}`);
+      }
+      
       return;
     }
 
@@ -142,8 +159,153 @@ const getRecordingStatus = defineTool({
       response.addResult(`📐 Video size: auto-scaled to fit 800x800`);
 
     response.addResult(`🎬 Active recordings: ${recordingInfo.activeRecordings}`);
+
+    // Show helpful path info for MCP clients
+    const outputDir = recordingInfo.config?.dir;
+    if (outputDir) {
+      const absolutePath = path.resolve(outputDir);
+      response.addResult(`📍 Absolute path: ${absolutePath}`);
+      
+      // Check if directory exists and show contents
+      const fs = await import('fs');
+      if (fs.existsSync(absolutePath)) {
+        try {
+          const files = fs.readdirSync(absolutePath);
+          const webmFiles = files.filter(f => f.endsWith('.webm'));
+          if (webmFiles.length > 0) {
+            response.addResult(`📹 Existing video files in directory: ${webmFiles.length}`);
+            webmFiles.forEach(file => response.addResult(`  • ${file}`));
+          } else {
+            response.addResult(`📁 Directory exists but no .webm files found yet`);
+          }
+        } catch (error: any) {
+          response.addResult(`⚠️  Could not read directory contents: ${error.message}`);
+        }
+      } else {
+        response.addResult(`⚠️  Output directory does not exist yet (will be created when recording starts)`);
+      }
+    }
+
+    // Show debug information
+    const registry = ArtifactManagerRegistry.getInstance();
+    const artifactManager = context.sessionId ? registry.getManager(context.sessionId) : undefined;
+    
+    if (artifactManager) {
+      response.addResult(`\n🔍 Debug Info:`);
+      response.addResult(`🆔 Session ID: ${context.sessionId}`);
+      response.addResult(`📂 Session directory: ${artifactManager.getSessionDirectory()}`);
+    }
+
     if (recordingInfo.activeRecordings === 0)
       response.addResult(`\n💡 Tip: Navigate to pages to start recording browser actions`);
+  },
+});
+
+const revealArtifactPaths = defineTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_reveal_artifact_paths',
+    title: 'Reveal artifact storage paths',
+    description: 'Show where artifacts (videos, screenshots, etc.) are stored, including resolved absolute paths. Useful for debugging when you cannot find generated files.',
+    inputSchema: z.object({}),
+    type: 'readOnly',
+  },
+
+  handle: async (context, params, response) => {
+    response.addResult('🗂️  Artifact Storage Paths');
+    response.addResult('=========================\n');
+
+    // Show default output directory
+    response.addResult(`📁 Default output directory: ${context.config.outputDir}`);
+    response.addResult(`📍 Resolved absolute path: ${path.resolve(context.config.outputDir)}\n`);
+
+    // Show artifact manager paths if configured
+    const registry = ArtifactManagerRegistry.getInstance();
+    const artifactManager = context.sessionId ? registry.getManager(context.sessionId) : undefined;
+
+    if (artifactManager) {
+      const baseDir = artifactManager.getBaseDirectory();
+      const sessionDir = artifactManager.getSessionDirectory();
+
+      response.addResult('🎯 Centralized Artifact Storage (ACTIVE):');
+      response.addResult(`📁 Base directory: ${baseDir}`);
+      response.addResult(`📍 Base absolute path: ${path.resolve(baseDir)}`);
+      response.addResult(`📂 Session directory: ${sessionDir}`);
+      response.addResult(`📍 Session absolute path: ${path.resolve(sessionDir)}`);
+      response.addResult(`🆔 Session ID: ${context.sessionId}\n`);
+
+      // Show subdirectories
+      response.addResult('📋 Available subdirectories:');
+      const subdirs = ['videos', 'screenshots', 'api-logs', 'traces'];
+      for (const subdir of subdirs) {
+        const subdirPath = artifactManager.getSubdirectory(subdir);
+        const fs = await import('fs');
+        const exists = fs.existsSync(subdirPath);
+        response.addResult(`  📁 ${subdir}: ${subdirPath} ${exists ? '✅' : '⚠️ (will be created when needed)'}`);
+      }
+
+      // Show any existing files in the session directory
+      const fs = await import('fs');
+      if (fs.existsSync(sessionDir)) {
+        try {
+          const items = fs.readdirSync(sessionDir, { withFileTypes: true });
+          const files = items.filter(item => item.isFile()).map(item => item.name);
+          const dirs = items.filter(item => item.isDirectory()).map(item => item.name);
+
+          if (dirs.length > 0) {
+            response.addResult(`\n📂 Existing subdirectories: ${dirs.join(', ')}`);
+          }
+
+          if (files.length > 0) {
+            response.addResult(`📄 Files in session directory: ${files.join(', ')}`);
+          }
+
+          // Count .webm files across all subdirectories
+          let webmCount = 0;
+          function countWebmFiles(dir: string) {
+            try {
+              const contents = fs.readdirSync(dir, { withFileTypes: true });
+              for (const item of contents) {
+                const fullPath = path.join(dir, item.name);
+                if (item.isDirectory()) {
+                  countWebmFiles(fullPath);
+                } else if (item.name.endsWith('.webm')) {
+                  webmCount++;
+                }
+              }
+            } catch (error) {
+              // Ignore permission errors
+            }
+          }
+          countWebmFiles(sessionDir);
+
+          if (webmCount > 0) {
+            response.addResult(`🎬 Total .webm video files found: ${webmCount}`);
+          }
+        } catch (error: any) {
+          response.addResult(`⚠️  Could not list session directory contents: ${error.message}`);
+        }
+      }
+    } else {
+      response.addResult('⚠️  No centralized artifact storage configured');
+      response.addResult('📁 Files will be saved to default output directory');
+      response.addResult(`📍 Default path: ${path.resolve(context.config.outputDir)}\n`);
+    }
+
+    // Show current video recording paths if active
+    const recordingInfo = context.getVideoRecordingInfo();
+    if (recordingInfo.enabled && recordingInfo.config?.dir) {
+      response.addResult('🎥 Current Video Recording:');
+      response.addResult(`📁 Video output directory: ${recordingInfo.config.dir}`);
+      response.addResult(`📍 Video absolute path: ${path.resolve(recordingInfo.config.dir)}`);
+      response.addResult(`📝 Base filename pattern: ${recordingInfo.baseFilename}*.webm`);
+    }
+
+    response.addResult('\n💡 Tips:');
+    response.addResult('• Use these absolute paths to locate your generated files');
+    response.addResult('• Video files (.webm) are created when pages close or recording stops');
+    response.addResult('• Screenshot files (.png/.jpeg) are created immediately when taken');
   },
 });
 
@@ -151,4 +313,5 @@ export default [
   startRecording,
   stopRecording,
   getRecordingStatus,
+  revealArtifactPaths,
 ];

@@ -21,6 +21,8 @@ import { devices } from 'playwright';
 import { logUnhandledError } from './log.js';
 import { Tab } from './tab.js';
 import { EnvironmentIntrospector } from './environmentIntrospection.js';
+import { RequestInterceptor, RequestInterceptorOptions } from './requestInterceptor.js';
+import { ArtifactManagerRegistry } from './artifactManager.js';
 
 import type { Tool } from './tools/tool.js';
 import type { FullConfig } from './config.js';
@@ -50,6 +52,9 @@ export class Context {
 
   // Chrome extension management
   private _installedExtensions: Array<{ path: string; name: string; version?: string }> = [];
+
+  // Request interception for traffic analysis
+  private _requestInterceptor: RequestInterceptor | undefined;
 
   // Differential snapshot tracking
   private _lastSnapshotFingerprint: string | undefined;
@@ -178,8 +183,17 @@ export class Context {
       this._currentTab = tab;
 
     // Track pages with video recording
-    if (this._videoRecordingConfig && page.video())
+    // Note: page.video() may be null initially, so we track based on config presence
+    if (this._videoRecordingConfig) {
       this._activePagesWithVideos.add(page);
+      testDebug(`Added page to video tracking. Active recordings: ${this._activePagesWithVideos.size}`);
+    }
+
+    // Attach request interceptor to new pages
+    if (this._requestInterceptor) {
+      void this._requestInterceptor.attach(page);
+      testDebug('Request interceptor attached to new page');
+    }
 
   }
 
@@ -219,6 +233,9 @@ export class Context {
   }
 
   async dispose() {
+    // Clean up request interceptor
+    this.stopRequestMonitoring();
+
     await this.closeBrowserContext();
     Context._allContexts.delete(this);
   }
@@ -316,9 +333,9 @@ export class Context {
     const browserContext = await browser.newContext(contextOptions);
 
     // Apply offline mode if configured
-    if ((this.config as any).offline !== undefined) {
+    if ((this.config as any).offline !== undefined)
       await browserContext.setOffline((this.config as any).offline);
-    }
+
 
     return {
       browserContext,
@@ -330,6 +347,9 @@ export class Context {
   }
 
   setVideoRecording(config: { dir: string; size?: { width: number; height: number } }, baseFilename: string) {
+    // Clear any existing video recording state first
+    this.clearVideoRecordingState();
+    
     this._videoRecordingConfig = config;
     this._videoBaseFilename = baseFilename;
 
@@ -339,6 +359,8 @@ export class Context {
         // The next call to _ensureBrowserContext will create a new context with video recording
       });
     }
+    
+    testDebug(`Video recording configured: ${JSON.stringify(config)}, filename: ${baseFilename}`);
   }
 
   getVideoRecordingInfo() {
@@ -452,33 +474,140 @@ export class Context {
   }
 
   async stopVideoRecording(): Promise<string[]> {
-    if (!this._videoRecordingConfig)
+    if (!this._videoRecordingConfig) {
+      testDebug('stopVideoRecording called but no recording config found');
       return [];
+    }
 
-
+    testDebug(`stopVideoRecording: ${this._activePagesWithVideos.size} pages tracked for video`);
     const videoPaths: string[] = [];
 
-    // Close all pages to save videos
+    // Force navigation on pages that don't have video objects yet
+    // This ensures video recording actually starts
     for (const page of this._activePagesWithVideos) {
       try {
         if (!page.isClosed()) {
-          await page.close();
+          const video = page.video();
+          if (!video) {
+            testDebug('Page has no video object, trying to trigger recording by navigating to about:blank');
+            // Navigate to trigger video recording start
+            await page.goto('about:blank');
+            // Small delay to let video recording initialize
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      } catch (error) {
+        testDebug('Error triggering video recording on page:', error);
+      }
+    }
+
+    // Collect video paths AFTER ensuring recording is active
+    for (const page of this._activePagesWithVideos) {
+      try {
+        if (!page.isClosed()) {
           const video = page.video();
           if (video) {
+            // Get the video path before closing
             const videoPath = await video.path();
             videoPaths.push(videoPath);
+            testDebug(`Found video path: ${videoPath}`);
+          } else {
+            testDebug('Page still has no video object after navigation attempt');
           }
+        }
+      } catch (error) {
+        testDebug('Error getting video path:', error);
+      }
+    }
+
+    // Now close all pages to finalize videos
+    for (const page of this._activePagesWithVideos) {
+      try {
+        if (!page.isClosed()) {
+          testDebug(`Closing page for video finalization: ${page.url()}`);
+          await page.close();
         }
       } catch (error) {
         testDebug('Error closing page for video recording:', error);
       }
     }
 
+    // Keep recording config available for inspection until explicitly cleared
+    // Don't clear it immediately to help with debugging
+    testDebug(`stopVideoRecording complete: ${videoPaths.length} videos saved, config preserved for debugging`);
+    
+    // Clear the page tracking but keep config for status queries
     this._activePagesWithVideos.clear();
+    
+    return videoPaths;
+  }
+
+  // Add method to clear video recording state (called by start recording)
+  clearVideoRecordingState(): void {
     this._videoRecordingConfig = undefined;
     this._videoBaseFilename = undefined;
+    this._activePagesWithVideos.clear();
+    testDebug('Video recording state cleared');
+  }
 
-    return videoPaths;
+  // Request Interception and Traffic Analysis
+
+  /**
+   * Start comprehensive request monitoring and interception
+   */
+  async startRequestMonitoring(options: RequestInterceptorOptions = {}): Promise<void> {
+    if (this._requestInterceptor) {
+      testDebug('Request interceptor already active, stopping previous instance');
+      this._requestInterceptor.detach();
+    }
+
+    // Use artifact manager for output path if available
+    if (!options.outputPath && this.sessionId) {
+      const artifactManager = this.getArtifactManager();
+      if (artifactManager)
+        options.outputPath = artifactManager.getSubdirectory('requests');
+
+    }
+
+    this._requestInterceptor = new RequestInterceptor(options);
+
+    // Attach to current tab if available
+    const currentTab = this._currentTab;
+    if (currentTab) {
+      await this._requestInterceptor.attach(currentTab.page);
+      testDebug('Request interceptor attached to current tab');
+    }
+
+    testDebug('Request monitoring started with options:', options);
+  }
+
+  /**
+   * Get the active request interceptor
+   */
+  getRequestInterceptor(): RequestInterceptor | undefined {
+    return this._requestInterceptor;
+  }
+
+  /**
+   * Get artifact manager for the current session
+   */
+  getArtifactManager() {
+    if (!this.sessionId)
+      return undefined;
+
+    const registry = ArtifactManagerRegistry.getInstance();
+    return registry.getManager(this.sessionId);
+  }
+
+  /**
+   * Stop request monitoring and clean up
+   */
+  stopRequestMonitoring(): void {
+    if (this._requestInterceptor) {
+      this._requestInterceptor.detach();
+      this._requestInterceptor = undefined;
+      testDebug('Request monitoring stopped');
+    }
   }
 
   // Chrome Extension Management

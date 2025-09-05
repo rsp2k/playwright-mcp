@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import artifacts from './tools/artifacts.js';
 import common from './tools/common.js';
 import configure from './tools/configure.js';
 import console from './tools/console.js';
@@ -25,6 +26,7 @@ import keyboard from './tools/keyboard.js';
 import navigate from './tools/navigate.js';
 import network from './tools/network.js';
 import pdf from './tools/pdf.js';
+import requests from './tools/requests.js';
 import snapshot from './tools/snapshot.js';
 import tabs from './tools/tabs.js';
 import screenshot from './tools/screenshot.js';
@@ -36,6 +38,7 @@ import type { Tool } from './tools/tool.js';
 import type { FullConfig } from './config.js';
 
 export const allTools: Tool<any>[] = [
+  ...artifacts,
   ...common,
   ...configure,
   ...console,
@@ -48,6 +51,7 @@ export const allTools: Tool<any>[] = [
   ...network,
   ...mouse,
   ...pdf,
+  ...requests,
   ...screenshot,
   ...snapshot,
   ...tabs,

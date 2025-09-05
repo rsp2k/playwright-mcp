@@ -74,7 +74,7 @@ export class Tab extends EventEmitter<TabEventsInterface> {
 
     // Initialize service worker console capture
     void this._initializeServiceWorkerConsoleCapture();
-    
+
     // Initialize extension-based console capture
     void this._initializeExtensionConsoleCapture();
   }
@@ -177,13 +177,13 @@ export class Tab extends EventEmitter<TabEventsInterface> {
 
       // Enable runtime domain for console API calls
       await cdpSession.send('Runtime.enable');
-      
+
       // Enable network domain for network-related errors
       await cdpSession.send('Network.enable');
-      
+
       // Enable security domain for mixed content warnings
       await cdpSession.send('Security.enable');
-      
+
       // Enable log domain for browser log entries
       await cdpSession.send('Log.enable');
 
@@ -196,17 +196,17 @@ export class Tab extends EventEmitter<TabEventsInterface> {
       cdpSession.on('Runtime.exceptionThrown', (event: any) => {
         this._handleServiceWorkerException(event);
       });
-      
+
       // Listen for network failed events
       cdpSession.on('Network.loadingFailed', (event: any) => {
         this._handleNetworkError(event);
       });
-      
+
       // Listen for security state changes (mixed content)
       cdpSession.on('Security.securityStateChanged', (event: any) => {
         this._handleSecurityStateChange(event);
       });
-      
+
       // Listen for log entries (browser-level logs)
       cdpSession.on('Log.entryAdded', (event: any) => {
         this._handleLogEntry(event);
@@ -327,14 +327,14 @@ export class Tab extends EventEmitter<TabEventsInterface> {
     try {
       // Listen for console messages from the extension
       await this.page.evaluate(() => {
-        window.addEventListener('message', (event) => {
+        window.addEventListener('message', event => {
           if (event.data && event.data.type === 'PLAYWRIGHT_CONSOLE_CAPTURE') {
             const message = event.data.consoleMessage;
-            
+
             // Store the message in a global array for Playwright to access
-            if (!(window as any)._playwrightExtensionConsoleMessages) {
+            if (!(window as any)._playwrightExtensionConsoleMessages)
               (window as any)._playwrightExtensionConsoleMessages = [];
-            }
+
             (window as any)._playwrightExtensionConsoleMessages.push(message);
           }
         });
@@ -342,7 +342,7 @@ export class Tab extends EventEmitter<TabEventsInterface> {
 
       // Poll for new extension console messages
       setInterval(() => {
-        this._checkForExtensionConsoleMessages();
+        void this._checkForExtensionConsoleMessages();
       }, 1000);
 
     } catch (error) {
@@ -353,9 +353,9 @@ export class Tab extends EventEmitter<TabEventsInterface> {
   private async _checkForExtensionConsoleMessages() {
     try {
       const newMessages = await this.page.evaluate(() => {
-        if (!(window as any)._playwrightExtensionConsoleMessages) {
+        if (!(window as any)._playwrightExtensionConsoleMessages)
           return [];
-        }
+
         const messages = (window as any)._playwrightExtensionConsoleMessages;
         (window as any)._playwrightExtensionConsoleMessages = [];
         return messages;
