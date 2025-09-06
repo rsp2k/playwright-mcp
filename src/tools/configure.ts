@@ -38,7 +38,13 @@ const configureSchema = z.object({
   timezone: z.string().optional().describe('Timezone ID (e.g., "America/New_York", "Europe/London", "Asia/Tokyo")'),
   colorScheme: z.enum(['light', 'dark', 'no-preference']).optional().describe('Preferred color scheme'),
   permissions: z.array(z.string()).optional().describe('Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])'),
-  offline: z.boolean().optional().describe('Whether to emulate offline network conditions (equivalent to DevTools offline mode)')
+  offline: z.boolean().optional().describe('Whether to emulate offline network conditions (equivalent to DevTools offline mode)'),
+  
+  // Browser UI Customization Options
+  chromiumSandbox: z.boolean().optional().describe('Enable/disable Chromium sandbox (affects browser appearance)'),
+  slowMo: z.number().min(0).optional().describe('Slow down operations by specified milliseconds (helps with visual tracking)'),
+  devtools: z.boolean().optional().describe('Open browser with DevTools panel open (Chromium only)'),
+  args: z.array(z.string()).optional().describe('Additional browser launch arguments for UI customization (e.g., ["--force-color-profile=srgb", "--disable-features=VizDisplayCompositor"])'),
 });
 
 const listDevicesSchema = z.object({});
@@ -100,19 +106,19 @@ const offlineModeTest = defineTool({
     try {
       // Get current browser context
       const tab = context.currentTab();
-      if (!tab) {
+      if (!tab)
         throw new Error('No active browser tab. Navigate to a page first.');
-      }
-      
+
+
       const browserContext = tab.page.context();
       await browserContext.setOffline(params.offline);
-      
+
       response.addResult(
-        `✅ Browser offline mode ${params.offline ? 'enabled' : 'disabled'}\n\n` +
+          `✅ Browser offline mode ${params.offline ? 'enabled' : 'disabled'}\n\n` +
         `The browser will now ${params.offline ? 'block all network requests' : 'allow network requests'} ` +
         `(equivalent to ${params.offline ? 'checking' : 'unchecking'} the offline checkbox in DevTools).`
       );
-      
+
     } catch (error) {
       throw new Error(`Failed to set offline mode: ${error}`);
     }

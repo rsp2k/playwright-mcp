@@ -411,6 +411,12 @@ export class Context {
     colorScheme?: 'light' | 'dark' | 'no-preference';
     permissions?: string[];
     offline?: boolean;
+    
+    // Browser UI Customization
+    chromiumSandbox?: boolean;
+    slowMo?: number;
+    devtools?: boolean;
+    args?: string[];
   }): Promise<void> {
     const currentConfig = { ...this.config };
 
@@ -469,6 +475,29 @@ export class Context {
     if (changes.offline !== undefined)
       (currentConfig.browser as any).offline = changes.offline;
 
+    // Apply browser launch options for UI customization
+    if (changes.chromiumSandbox !== undefined)
+      currentConfig.browser.launchOptions.chromiumSandbox = changes.chromiumSandbox;
+
+    if (changes.slowMo !== undefined)
+      currentConfig.browser.launchOptions.slowMo = changes.slowMo;
+
+    if (changes.devtools !== undefined)
+      currentConfig.browser.launchOptions.devtools = changes.devtools;
+
+    if (changes.args && Array.isArray(changes.args)) {
+      // Merge with existing args, avoiding duplicates
+      const existingArgs = currentConfig.browser.launchOptions.args || [];
+      const newArgs = [...existingArgs];
+      
+      for (const arg of changes.args) {
+        if (!existingArgs.includes(arg)) {
+          newArgs.push(arg);
+        }
+      }
+      
+      currentConfig.browser.launchOptions.args = newArgs;
+    }
 
     // Store the modified config
     (this as any).config = currentConfig;
@@ -480,7 +509,7 @@ export class Context {
     this._tabs = [];
     this._currentTab = undefined;
 
-    testDebug(`browser config updated for session ${this.sessionId}: headless=${currentConfig.browser.launchOptions.headless}, viewport=${JSON.stringify(currentConfig.browser.contextOptions.viewport)}`);
+    testDebug(`browser config updated for session ${this.sessionId}: headless=${currentConfig.browser.launchOptions.headless}, viewport=${JSON.stringify(currentConfig.browser.contextOptions.viewport)}, slowMo=${currentConfig.browser.launchOptions.slowMo}, devtools=${currentConfig.browser.launchOptions.devtools}`);
   }
 
   async stopVideoRecording(): Promise<string[]> {
