@@ -88,19 +88,19 @@ browser_set_recording_mode({ mode: "smart" })
 // 2. Start recording with optimal size (auto-sets viewport)
 browser_start_recording({
   size: { width: 1280, height: 720 },
-  filename: "internachi-demo"
+  filename: "product-demo"
 })
 
 // 3. Perform demo actions (recording manages itself)
-browser_navigate({ url: "https://l.inspect.pics" })
+browser_navigate({ url: "https://example.com" })
 browser_click({ element: "login button", ref: "..." })
-browser_type({ element: "email field", ref: "...", text: "demo@internachi.org" })
+browser_type({ element: "email field", ref: "...", text: "demo@example.org" })
 browser_wait_for({ time: 3 })  // Auto-pauses here
 browser_click({ element: "submit", ref: "..." })
 
 // 4. Finalize recording
 const videos = browser_stop_recording()
-// Returns: ["path/to/internachi-demo-segment1.webm"]
+// Returns: ["path/to/product-demo-segment1.webm"]
 ```
 
 ### Multiple Segment Workflow:
@@ -145,12 +145,12 @@ browser_stop_recording()
 
 ## 🚀 Common Use Cases
 
-### InterNACHI Marketing Demo:
+### Marketing Demo:
 ```javascript
 browser_set_recording_mode({ mode: "smart" })
 browser_start_recording({
   size: { width: 1280, height: 720 },
-  filename: "internachi-expert-agent-demo"
+  filename: "product-demo"
 })
 // Perfect for marketing with auto-pause/resume
 ```
