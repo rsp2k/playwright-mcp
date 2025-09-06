@@ -25,13 +25,14 @@ const startRecording = defineTool({
   schema: {
     name: 'browser_start_recording',
     title: 'Start video recording',
-    description: 'Start recording browser session video. This must be called BEFORE performing browser actions you want to record. New browser contexts will be created with video recording enabled. Videos are automatically saved when pages/contexts close.',
+    description: 'Start recording browser session video with intelligent viewport matching. For best results, the browser viewport size should match the video recording size to avoid gray space around content. Use browser_configure to set viewport size before recording.',
     inputSchema: z.object({
       size: z.object({
-        width: z.number().optional().describe('Video width in pixels (default: scales to fit 800x800)'),
-        height: z.number().optional().describe('Video height in pixels (default: scales to fit 800x800)'),
-      }).optional().describe('Video recording size'),
+        width: z.number().optional().describe('Video width in pixels (default: 1280). For full-frame content, set browser viewport to match this width.'),
+        height: z.number().optional().describe('Video height in pixels (default: 720). For full-frame content, set browser viewport to match this height.'),
+      }).optional().describe('Video recording dimensions. IMPORTANT: Browser viewport should match these dimensions to avoid gray borders around content.'),
       filename: z.string().optional().describe('Base filename for video files (default: session-{timestamp}.webm)'),
+      autoSetViewport: z.boolean().optional().default(true).describe('Automatically set browser viewport to match video recording size (recommended for full-frame content)'),
     }),
     type: 'destructive',
   },
@@ -51,24 +52,72 @@ const startRecording = defineTool({
       videoDir = path.join(context.config.outputDir, 'videos');
 
 
+    // Default video size for better demos
+    const videoSize = params.size || { width: 1280, height: 720 };
+    
     // Update context options to enable video recording
     const recordVideoOptions: any = {
       dir: videoDir,
+      size: videoSize,
     };
 
-    if (params.size)
-      recordVideoOptions.size = params.size;
-
+    // Automatically set viewport to match video size for full-frame content
+    if (params.autoSetViewport !== false) {
+      try {
+        await context.updateBrowserConfig({
+          viewport: {
+            width: videoSize.width || 1280,
+            height: videoSize.height || 720,
+          },
+        });
+        response.addResult(`🖥️  Browser viewport automatically set to ${videoSize.width}x${videoSize.height} to match video size`);
+      } catch (error) {
+        response.addResult(`⚠️  Could not auto-set viewport: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        response.addResult(`💡 Manually set viewport with: browser_configure({viewport: {width: ${videoSize.width}, height: ${videoSize.height}}})`);
+      }
+    }
 
     // Store video recording config in context for future browser contexts
     context.setVideoRecording(recordVideoOptions, baseFilename);
 
-    response.addResult(`✓ Video recording enabled. Videos will be saved to: ${videoDir}`);
-    response.addResult(`✓ Video files will be named: ${baseFilename}-*.webm`);
-    response.addResult(`\nNext steps:`);
+    response.addResult(`🎬 Video recording started!`);
+    response.addResult(`📁 Videos will be saved to: ${videoDir}`);
+    response.addResult(`📝 Files will be named: ${baseFilename}-*.webm`);
+    response.addResult(`📐 Video size: ${videoSize.width}x${videoSize.height}`);
+    
+    // Show viewport matching info
+    if (params.autoSetViewport !== false) {
+      response.addResult(`🖼️  Browser viewport matched to video size for full-frame content`);
+    } else {
+      response.addResult(`⚠️  Viewport not automatically set - you may see gray borders around content`);
+      response.addResult(`💡 For full-frame content, use: browser_configure({viewport: {width: ${videoSize.width}, height: ${videoSize.height}}})`);
+    }
+    
+    // Show current recording mode
+    const recordingInfo = context.getVideoRecordingInfo();
+    response.addResult(`🎯 Recording mode: ${recordingInfo.mode}`);
+    
+    switch (recordingInfo.mode) {
+      case 'smart':
+        response.addResult(`🧠 Smart mode: Auto-pauses during waits, resumes during actions`);
+        response.addResult(`💡 Perfect for creating clean demo videos with minimal dead time`);
+        break;
+      case 'continuous':
+        response.addResult(`📹 Continuous mode: Recording everything without pauses`);
+        break;
+      case 'action-only':
+        response.addResult(`⚡ Action-only mode: Only recording during browser interactions`);
+        break;
+      case 'segment':
+        response.addResult(`🎞️ Segment mode: Creating separate files for each action sequence`);
+        break;
+    }
+    
+    response.addResult(`\n📋 Next steps:`);
     response.addResult(`1. Navigate to pages and perform browser actions`);
     response.addResult(`2. Use browser_stop_recording when finished to save videos`);
-    response.addResult(`3. Videos are automatically saved when pages close`);
+    response.addResult(`3. Use browser_set_recording_mode to change behavior`);
+    response.addResult(`4. Videos are automatically saved when pages close`);
     response.addCode(`// Video recording enabled for new browser contexts`);
     response.addCode(`const context = await browser.newContext({`);
     response.addCode(`  recordVideo: {`);
@@ -87,7 +136,7 @@ const stopRecording = defineTool({
   schema: {
     name: 'browser_stop_recording',
     title: 'Stop video recording',
-    description: 'Stop video recording and return the paths to recorded video files. This closes all active pages to ensure videos are properly saved. Call this when you want to finalize and access the recorded videos.',
+    description: 'Finalize video recording session and return paths to all recorded video files (.webm format). Automatically closes browser pages to ensure videos are properly saved and available for use. Essential final step for completing video recording workflows and accessing demo files.',
     inputSchema: z.object({}),
     type: 'readOnly',
   },
@@ -159,6 +208,17 @@ const getRecordingStatus = defineTool({
       response.addResult(`📐 Video size: auto-scaled to fit 800x800`);
 
     response.addResult(`🎬 Active recordings: ${recordingInfo.activeRecordings}`);
+    response.addResult(`🎯 Recording mode: ${recordingInfo.mode}`);
+    
+    if (recordingInfo.paused) {
+      response.addResult(`⏸️ Status: PAUSED (${recordingInfo.pausedRecordings} recordings stored)`);
+    } else {
+      response.addResult(`▶️ Status: RECORDING`);
+    }
+    
+    if (recordingInfo.mode === 'segment') {
+      response.addResult(`🎞️ Current segment: ${recordingInfo.currentSegment}`);
+    }
 
     // Show helpful path info for MCP clients
     const outputDir = recordingInfo.config?.dir;
@@ -309,9 +369,93 @@ const revealArtifactPaths = defineTool({
   },
 });
 
+const pauseRecording = defineTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_pause_recording',
+    title: 'Pause video recording',
+    description: 'Manually pause the current video recording to eliminate dead time between actions. Useful for creating professional demo videos. In smart recording mode, pausing happens automatically during waits. Use browser_resume_recording to continue recording.',
+    inputSchema: z.object({}),
+    type: 'destructive',
+  },
+
+  handle: async (context, params, response) => {
+    const result = await context.pauseVideoRecording();
+    response.addResult(`⏸️ ${result.message}`);
+    if (result.paused > 0) {
+      response.addResult(`💡 Use browser_resume_recording to continue`);
+    }
+  },
+});
+
+const resumeRecording = defineTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_resume_recording',
+    title: 'Resume video recording',
+    description: 'Manually resume previously paused video recording. New video segments will capture subsequent browser actions. In smart recording mode, resuming happens automatically when browser actions begin. Useful for precise control over recording timing in demo videos.',
+    inputSchema: z.object({}),
+    type: 'destructive',
+  },
+
+  handle: async (context, params, response) => {
+    const result = await context.resumeVideoRecording();
+    response.addResult(`▶️ ${result.message}`);
+  },
+});
+
+const setRecordingMode = defineTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_set_recording_mode',
+    title: 'Set video recording mode',
+    description: 'Configure intelligent video recording behavior for professional demo videos. Choose from continuous recording, smart auto-pause/resume, action-only capture, or segmented recording. Smart mode is recommended for marketing demos as it eliminates dead time automatically.',
+    inputSchema: z.object({
+      mode: z.enum(['continuous', 'smart', 'action-only', 'segment']).describe('Video recording behavior mode:\n• continuous: Record everything continuously including waits (traditional behavior, may have dead time)\n• smart: Automatically pause during waits, resume during actions (RECOMMENDED for clean demo videos)\n• action-only: Only record during active browser interactions, minimal recording time\n• segment: Create separate video files for each action sequence (useful for splitting demos into clips)'),
+    }),
+    type: 'destructive',
+  },
+
+  handle: async (context, params, response) => {
+    context.setVideoRecordingMode(params.mode);
+    
+    response.addResult(`🎬 Video recording mode set to: ${params.mode}`);
+    
+    switch (params.mode) {
+      case 'continuous':
+        response.addResult('📹 Will record everything continuously (traditional behavior)');
+        break;
+      case 'smart':
+        response.addResult('🧠 Will auto-pause during waits, resume during actions (best for demos)');
+        response.addResult('💡 Perfect for creating clean marketing/demo videos');
+        break;
+      case 'action-only':
+        response.addResult('⚡ Will only record during active browser interactions');
+        response.addResult('💡 Minimal recording time, focuses on user actions');
+        break;
+      case 'segment':
+        response.addResult('🎞️ Will create separate video files for each action sequence');
+        response.addResult('💡 Useful for breaking demos into individual clips');
+        break;
+    }
+    
+    const recordingInfo = context.getVideoRecordingInfo();
+    if (recordingInfo.enabled) {
+      response.addResult(`\n🎥 Current recording status: ${recordingInfo.paused ? 'paused' : 'active'}`);
+      response.addResult(`📊 Active recordings: ${recordingInfo.activeRecordings}`);
+    }
+  },
+});
+
 export default [
   startRecording,
   stopRecording,
   getRecordingStatus,
   revealArtifactPaths,
+  pauseRecording,
+  resumeRecording,
+  setRecordingMode,
 ];

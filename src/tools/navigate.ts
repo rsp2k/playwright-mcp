@@ -31,8 +31,14 @@ const navigate = defineTool({
   },
 
   handle: async (context, params, response) => {
+    // Smart recording: Begin action
+    await context.beginVideoAction('navigate');
+    
     const tab = await context.ensureTab();
     await tab.navigate(params.url);
+
+    // Smart recording: End action (auto-pause in smart mode)
+    await context.endVideoAction('navigate');
 
     response.setIncludeSnapshot();
     response.addCode(`// Navigate to ${params.url}`);

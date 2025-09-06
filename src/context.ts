@@ -41,6 +41,11 @@ export class Context {
   private _videoRecordingConfig: { dir: string; size?: { width: number; height: number } } | undefined;
   private _videoBaseFilename: string | undefined;
   private _activePagesWithVideos: Set<playwright.Page> = new Set();
+  private _videoRecordingPaused: boolean = false;
+  private _pausedPageVideos: Map<playwright.Page, playwright.Video> = new Map();
+  private _videoRecordingMode: 'continuous' | 'smart' | 'action-only' | 'segment' = 'smart';
+  private _currentVideoSegment: number = 1;
+  private _autoRecordingEnabled: boolean = true;
   private _environmentIntrospector: EnvironmentIntrospector;
 
   private static _allContexts: Set<Context> = new Set();
@@ -369,6 +374,11 @@ export class Context {
       config: this._videoRecordingConfig,
       baseFilename: this._videoBaseFilename,
       activeRecordings: this._activePagesWithVideos.size,
+      paused: this._videoRecordingPaused,
+      pausedRecordings: this._pausedPageVideos.size,
+      mode: this._videoRecordingMode,
+      currentSegment: this._currentVideoSegment,
+      autoRecordingEnabled: this._autoRecordingEnabled,
     };
   }
 
@@ -547,7 +557,173 @@ export class Context {
     this._videoRecordingConfig = undefined;
     this._videoBaseFilename = undefined;
     this._activePagesWithVideos.clear();
+    this._videoRecordingPaused = false;
+    this._pausedPageVideos.clear();
+    this._currentVideoSegment = 1;
+    this._autoRecordingEnabled = true;
+    // Don't reset recording mode - let it persist between sessions
     testDebug('Video recording state cleared');
+  }
+
+  async pauseVideoRecording(): Promise<{ paused: number; message: string }> {
+    if (!this._videoRecordingConfig) {
+      testDebug('pauseVideoRecording called but no recording config found');
+      return { paused: 0, message: 'No video recording is active' };
+    }
+
+    if (this._videoRecordingPaused) {
+      testDebug('Video recording is already paused');
+      return { paused: this._pausedPageVideos.size, message: 'Video recording is already paused' };
+    }
+
+    testDebug(`pauseVideoRecording: attempting to pause ${this._activePagesWithVideos.size} active recordings`);
+    
+    // Store current video objects and close pages to pause recording
+    let pausedCount = 0;
+    for (const page of this._activePagesWithVideos) {
+      try {
+        if (!page.isClosed()) {
+          const video = page.video();
+          if (video) {
+            // Store the video object for later resume
+            this._pausedPageVideos.set(page, video);
+            testDebug(`Stored video object for page: ${page.url()}`);
+            pausedCount++;
+          }
+        }
+      } catch (error) {
+        testDebug('Error pausing video on page:', error);
+      }
+    }
+
+    this._videoRecordingPaused = true;
+    testDebug(`Video recording paused: ${pausedCount} recordings stored`);
+    
+    return { 
+      paused: pausedCount, 
+      message: `Video recording paused. ${pausedCount} active recordings stored.` 
+    };
+  }
+
+  async resumeVideoRecording(): Promise<{ resumed: number; message: string }> {
+    if (!this._videoRecordingConfig) {
+      testDebug('resumeVideoRecording called but no recording config found');
+      return { resumed: 0, message: 'No video recording is configured' };
+    }
+
+    if (!this._videoRecordingPaused) {
+      testDebug('Video recording is not currently paused');
+      return { resumed: 0, message: 'Video recording is not currently paused' };
+    }
+
+    testDebug(`resumeVideoRecording: attempting to resume ${this._pausedPageVideos.size} paused recordings`);
+    
+    // Resume recording by ensuring fresh browser context
+    // The paused videos are automatically finalized and new ones will start
+    let resumedCount = 0;
+    
+    // Force context recreation to start fresh recording
+    if (this._browserContextPromise) {
+      await this.closeBrowserContext();
+    }
+    
+    // Clear the paused videos map as we'll get new video objects
+    const pausedCount = this._pausedPageVideos.size;
+    this._pausedPageVideos.clear();
+    resumedCount = pausedCount;
+
+    this._videoRecordingPaused = false;
+    testDebug(`Video recording resumed: ${resumedCount} recordings will restart on next page creation`);
+    
+    return { 
+      resumed: resumedCount, 
+      message: `Video recording resumed. ${resumedCount} recordings will restart when pages are created.` 
+    };
+  }
+
+  isVideoRecordingPaused(): boolean {
+    return this._videoRecordingPaused;
+  }
+
+  // Smart Recording Management
+  setVideoRecordingMode(mode: 'continuous' | 'smart' | 'action-only' | 'segment'): void {
+    this._videoRecordingMode = mode;
+    testDebug(`Video recording mode set to: ${mode}`);
+  }
+
+  getVideoRecordingMode(): string {
+    return this._videoRecordingMode;
+  }
+
+  async beginVideoAction(actionName: string): Promise<void> {
+    if (!this._videoRecordingConfig || !this._autoRecordingEnabled) return;
+
+    testDebug(`beginVideoAction: ${actionName}, mode: ${this._videoRecordingMode}`);
+
+    switch (this._videoRecordingMode) {
+      case 'continuous':
+        // Always recording, no action needed
+        break;
+        
+      case 'smart':
+      case 'action-only':
+        // Resume recording if paused
+        if (this._videoRecordingPaused) {
+          await this.resumeVideoRecording();
+        }
+        break;
+        
+      case 'segment':
+        // Create new segment for this action
+        if (this._videoRecordingPaused) {
+          await this.resumeVideoRecording();
+        }
+        // Note: Actual segment creation happens in stopVideoRecording
+        break;
+    }
+  }
+
+  async endVideoAction(actionName: string, shouldPause: boolean = true): Promise<void> {
+    if (!this._videoRecordingConfig || !this._autoRecordingEnabled) return;
+
+    testDebug(`endVideoAction: ${actionName}, shouldPause: ${shouldPause}, mode: ${this._videoRecordingMode}`);
+
+    switch (this._videoRecordingMode) {
+      case 'continuous':
+        // Never auto-pause in continuous mode
+        break;
+        
+      case 'smart':
+      case 'action-only':
+        // Auto-pause after action unless explicitly told not to
+        if (shouldPause && !this._videoRecordingPaused) {
+          await this.pauseVideoRecording();
+        }
+        break;
+        
+      case 'segment':
+        // Always end segment after action
+        await this.finalizeCurrentVideoSegment();
+        break;
+    }
+  }
+
+  async finalizeCurrentVideoSegment(): Promise<string[]> {
+    if (!this._videoRecordingConfig) return [];
+
+    testDebug(`Finalizing video segment ${this._currentVideoSegment}`);
+    
+    // Get current video paths before creating new segment
+    const segmentPaths = await this.stopVideoRecording();
+    
+    // Immediately restart recording for next segment
+    this._currentVideoSegment++;
+    const newFilename = `${this._videoBaseFilename}-segment-${this._currentVideoSegment}`;
+    
+    // Restart recording with new segment filename
+    this.setVideoRecording(this._videoRecordingConfig, newFilename);
+    
+    return segmentPaths;
   }
 
   // Request Interception and Traffic Analysis
