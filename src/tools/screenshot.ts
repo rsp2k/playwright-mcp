@@ -160,21 +160,21 @@ const screenshot = defineTabTool({
     }
 
     response.addResult(resultMessage);
-    
+
     // Only add image to response if dimensions are safe or explicitly allowed
     let addImageToResponse = true;
     if (!params.allowLargeImages) {
       try {
         const { width, height } = getImageDimensions(buffer);
         const maxDimension = 8000;
-        if (width > maxDimension || height > maxDimension) {
+        if (width > maxDimension || height > maxDimension)
           addImageToResponse = false;
-        }
+
       } catch (dimensionError) {
         // If we can't parse dimensions, continue and add the image
       }
     }
-    
+
     if (addImageToResponse) {
       response.addImage({
         contentType: fileType === 'png' ? 'image/png' : 'image/jpeg',

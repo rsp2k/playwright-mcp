@@ -101,10 +101,10 @@ const dismissAllFileChoosers = defineTabTool({
     response.addCode(`// Dismiss all ${fileChooserStates.length} file chooser dialogs`);
 
     // Clear all file chooser modal states
-    for (const modalState of fileChooserStates) {
+    for (const modalState of fileChooserStates)
       tab.clearModalState(modalState);
-    }
-    
+
+
     response.addResult(`Dismissed ${fileChooserStates.length} file chooser dialog(s)`);
   },
   clearsModalState: 'fileChooser',

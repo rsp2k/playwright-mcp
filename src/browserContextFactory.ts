@@ -72,12 +72,12 @@ class BaseContextFactory implements BrowserContextFactory {
     testDebug(`create browser context (${this.name})`);
     const browser = await this._obtainBrowser();
     const browserContext = await this._doCreateContext(browser, extensionPaths);
-    
+
     // Apply offline mode if configured
-    if ((this.browserConfig as any).offline !== undefined) {
+    if ((this.browserConfig as any).offline !== undefined)
       await browserContext.setOffline((this.browserConfig as any).offline);
-    }
-    
+
+
     return { browserContext, close: () => this._closeBrowserContext(browserContext, browser) };
   }
 
