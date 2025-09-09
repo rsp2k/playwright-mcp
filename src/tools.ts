@@ -16,6 +16,7 @@
 
 import artifacts from './tools/artifacts.js';
 import common from './tools/common.js';
+import codeInjection from './tools/codeInjection.js';
 import configure from './tools/configure.js';
 import console from './tools/console.js';
 import dialogs from './tools/dialogs.js';
@@ -39,6 +40,7 @@ import type { FullConfig } from './config.js';
 
 export const allTools: Tool<any>[] = [
   ...artifacts,
+  ...codeInjection,
   ...common,
   ...configure,
   ...console,

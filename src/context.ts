@@ -27,6 +27,7 @@ import { ArtifactManagerRegistry } from './artifactManager.js';
 import type { Tool } from './tools/tool.js';
 import type { FullConfig } from './config.js';
 import type { BrowserContextFactory } from './browserContextFactory.js';
+import type { InjectionConfig } from './tools/codeInjection.js';
 
 const testDebug = debug('pw:mcp:test');
 
@@ -64,6 +65,9 @@ export class Context {
   // Differential snapshot tracking
   private _lastSnapshotFingerprint: string | undefined;
   private _lastPageState: { url: string; title: string } | undefined;
+
+  // Code injection for debug toolbar and custom scripts
+  injectionConfig: InjectionConfig | undefined;
 
   constructor(tools: Tool[], config: FullConfig, browserContextFactory: BrowserContextFactory, environmentIntrospector?: EnvironmentIntrospector) {
     this.tools = tools;
@@ -200,6 +204,8 @@ export class Context {
       testDebug('Request interceptor attached to new page');
     }
 
+    // Auto-inject debug toolbar and custom code
+    void this._injectCodeIntoPage(page);
   }
 
   private _onPageClosed(tab: Tab) {
@@ -1008,5 +1014,73 @@ export class Context {
     if (updates.consoleOutputFile !== undefined)
       (this.config as any).consoleOutputFile = updates.consoleOutputFile === '' ? undefined : updates.consoleOutputFile;
 
+  }
+
+  /**
+   * Auto-inject debug toolbar and custom code into a new page
+   */
+  private async _injectCodeIntoPage(page: playwright.Page): Promise<void> {
+    if (!this.injectionConfig || !this.injectionConfig.enabled) {
+      return;
+    }
+
+    try {
+      // Import the injection functions (dynamic import to avoid circular deps)
+      const { generateDebugToolbarScript, wrapInjectedCode, generateInjectionScript } = await import('./tools/codeInjection.js');
+      
+      // Inject debug toolbar if enabled
+      if (this.injectionConfig.debugToolbar.enabled) {
+        const toolbarScript = generateDebugToolbarScript(
+          this.injectionConfig.debugToolbar,
+          this.sessionId,
+          this.clientVersion,
+          this._sessionStartTime
+        );
+        
+        // Add to page init script for future navigations
+        await page.addInitScript(toolbarScript);
+        
+        // Execute immediately if page is already loaded
+        if (page.url() && page.url() !== 'about:blank') {
+          await page.evaluate(toolbarScript).catch(error => {
+            testDebug('Error executing debug toolbar script on existing page:', error);
+          });
+        }
+        
+        testDebug(`Debug toolbar auto-injected into page: ${page.url()}`);
+      }
+
+      // Inject custom code
+      for (const injection of this.injectionConfig.customInjections) {
+        if (!injection.enabled || !injection.autoInject) {
+          continue;
+        }
+
+        try {
+          const wrappedCode = wrapInjectedCode(
+            injection,
+            this.sessionId,
+            this.injectionConfig.debugToolbar.projectName
+          );
+          const injectionScript = generateInjectionScript(wrappedCode);
+          
+          // Add to page init script
+          await page.addInitScript(injectionScript);
+          
+          // Execute immediately if page is already loaded
+          if (page.url() && page.url() !== 'about:blank') {
+            await page.evaluate(injectionScript).catch(error => {
+              testDebug(`Error executing custom injection "${injection.name}" on existing page:`, error);
+            });
+          }
+          
+          testDebug(`Custom injection "${injection.name}" auto-injected into page: ${page.url()}`);
+        } catch (error) {
+          testDebug(`Error injecting custom code "${injection.name}":`, error);
+        }
+      }
+    } catch (error) {
+      testDebug('Error in code injection system:', error);
+    }
   }
 }
