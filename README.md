@@ -7,6 +7,7 @@ A Model Context Protocol (MCP) server that provides browser automation capabilit
 - **Fast and lightweight**. Uses Playwright's accessibility tree, not pixel-based input.
 - **LLM-friendly**. No vision models needed, operates purely on structured data.
 - **Deterministic tool application**. Avoids ambiguity common with screenshot-based approaches.
+- **Multi-client identification**. Debug toolbar and code injection system for managing parallel MCP clients.
 
 ### Requirements
 - Node.js 18 or newer
