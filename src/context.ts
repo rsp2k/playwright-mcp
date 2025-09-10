@@ -360,7 +360,7 @@ export class Context {
   setVideoRecording(config: { dir: string; size?: { width: number; height: number } }, baseFilename: string) {
     // Clear any existing video recording state first
     this.clearVideoRecordingState();
-    
+
     this._videoRecordingConfig = config;
     this._videoBaseFilename = baseFilename;
 
@@ -370,7 +370,7 @@ export class Context {
         // The next call to _ensureBrowserContext will create a new context with video recording
       });
     }
-    
+
     testDebug(`Video recording configured: ${JSON.stringify(config)}, filename: ${baseFilename}`);
   }
 
@@ -417,7 +417,7 @@ export class Context {
     colorScheme?: 'light' | 'dark' | 'no-preference';
     permissions?: string[];
     offline?: boolean;
-    
+
     // Browser UI Customization
     chromiumSandbox?: boolean;
     slowMo?: number;
@@ -495,13 +495,13 @@ export class Context {
       // Merge with existing args, avoiding duplicates
       const existingArgs = currentConfig.browser.launchOptions.args || [];
       const newArgs = [...existingArgs];
-      
+
       for (const arg of changes.args) {
-        if (!existingArgs.includes(arg)) {
+        if (!existingArgs.includes(arg))
           newArgs.push(arg);
-        }
+
       }
-      
+
       currentConfig.browser.launchOptions.args = newArgs;
     }
 
@@ -580,10 +580,10 @@ export class Context {
     // Keep recording config available for inspection until explicitly cleared
     // Don't clear it immediately to help with debugging
     testDebug(`stopVideoRecording complete: ${videoPaths.length} videos saved, config preserved for debugging`);
-    
+
     // Clear the page tracking but keep config for status queries
     this._activePagesWithVideos.clear();
-    
+
     return videoPaths;
   }
 
@@ -612,7 +612,7 @@ export class Context {
     }
 
     testDebug(`pauseVideoRecording: attempting to pause ${this._activePagesWithVideos.size} active recordings`);
-    
+
     // Store current video objects and close pages to pause recording
     let pausedCount = 0;
     for (const page of this._activePagesWithVideos) {
@@ -633,10 +633,10 @@ export class Context {
 
     this._videoRecordingPaused = true;
     testDebug(`Video recording paused: ${pausedCount} recordings stored`);
-    
-    return { 
-      paused: pausedCount, 
-      message: `Video recording paused. ${pausedCount} active recordings stored.` 
+
+    return {
+      paused: pausedCount,
+      message: `Video recording paused. ${pausedCount} active recordings stored.`
     };
   }
 
@@ -652,16 +652,16 @@ export class Context {
     }
 
     testDebug(`resumeVideoRecording: attempting to resume ${this._pausedPageVideos.size} paused recordings`);
-    
+
     // Resume recording by ensuring fresh browser context
     // The paused videos are automatically finalized and new ones will start
     let resumedCount = 0;
-    
+
     // Force context recreation to start fresh recording
-    if (this._browserContextPromise) {
+    if (this._browserContextPromise)
       await this.closeBrowserContext();
-    }
-    
+
+
     // Clear the paused videos map as we'll get new video objects
     const pausedCount = this._pausedPageVideos.size;
     this._pausedPageVideos.clear();
@@ -669,10 +669,10 @@ export class Context {
 
     this._videoRecordingPaused = false;
     testDebug(`Video recording resumed: ${resumedCount} recordings will restart on next page creation`);
-    
-    return { 
-      resumed: resumedCount, 
-      message: `Video recording resumed. ${resumedCount} recordings will restart when pages are created.` 
+
+    return {
+      resumed: resumedCount,
+      message: `Video recording resumed. ${resumedCount} recordings will restart when pages are created.`
     };
   }
 
@@ -691,7 +691,8 @@ export class Context {
   }
 
   async beginVideoAction(actionName: string): Promise<void> {
-    if (!this._videoRecordingConfig || !this._autoRecordingEnabled) return;
+    if (!this._videoRecordingConfig || !this._autoRecordingEnabled)
+      return;
 
     testDebug(`beginVideoAction: ${actionName}, mode: ${this._videoRecordingMode}`);
 
@@ -699,27 +700,28 @@ export class Context {
       case 'continuous':
         // Always recording, no action needed
         break;
-        
+
       case 'smart':
       case 'action-only':
         // Resume recording if paused
-        if (this._videoRecordingPaused) {
+        if (this._videoRecordingPaused)
           await this.resumeVideoRecording();
-        }
+
         break;
-        
+
       case 'segment':
         // Create new segment for this action
-        if (this._videoRecordingPaused) {
+        if (this._videoRecordingPaused)
           await this.resumeVideoRecording();
-        }
+
         // Note: Actual segment creation happens in stopVideoRecording
         break;
     }
   }
 
   async endVideoAction(actionName: string, shouldPause: boolean = true): Promise<void> {
-    if (!this._videoRecordingConfig || !this._autoRecordingEnabled) return;
+    if (!this._videoRecordingConfig || !this._autoRecordingEnabled)
+      return;
 
     testDebug(`endVideoAction: ${actionName}, shouldPause: ${shouldPause}, mode: ${this._videoRecordingMode}`);
 
@@ -727,15 +729,15 @@ export class Context {
       case 'continuous':
         // Never auto-pause in continuous mode
         break;
-        
+
       case 'smart':
       case 'action-only':
         // Auto-pause after action unless explicitly told not to
-        if (shouldPause && !this._videoRecordingPaused) {
+        if (shouldPause && !this._videoRecordingPaused)
           await this.pauseVideoRecording();
-        }
+
         break;
-        
+
       case 'segment':
         // Always end segment after action
         await this.finalizeCurrentVideoSegment();
@@ -744,20 +746,21 @@ export class Context {
   }
 
   async finalizeCurrentVideoSegment(): Promise<string[]> {
-    if (!this._videoRecordingConfig) return [];
+    if (!this._videoRecordingConfig)
+      return [];
 
     testDebug(`Finalizing video segment ${this._currentVideoSegment}`);
-    
+
     // Get current video paths before creating new segment
     const segmentPaths = await this.stopVideoRecording();
-    
+
     // Immediately restart recording for next segment
     this._currentVideoSegment++;
     const newFilename = `${this._videoBaseFilename}-segment-${this._currentVideoSegment}`;
-    
+
     // Restart recording with new segment filename
     this.setVideoRecording(this._videoRecordingConfig, newFilename);
-    
+
     return segmentPaths;
   }
 
@@ -1020,60 +1023,60 @@ export class Context {
    * Auto-inject debug toolbar and custom code into a new page
    */
   private async _injectCodeIntoPage(page: playwright.Page): Promise<void> {
-    if (!this.injectionConfig || !this.injectionConfig.enabled) {
+    if (!this.injectionConfig || !this.injectionConfig.enabled)
       return;
-    }
+
 
     try {
       // Import the injection functions (dynamic import to avoid circular deps)
       const { generateDebugToolbarScript, wrapInjectedCode, generateInjectionScript } = await import('./tools/codeInjection.js');
-      
+
       // Inject debug toolbar if enabled
       if (this.injectionConfig.debugToolbar.enabled) {
         const toolbarScript = generateDebugToolbarScript(
-          this.injectionConfig.debugToolbar,
-          this.sessionId,
-          this.clientVersion,
-          this._sessionStartTime
+            this.injectionConfig.debugToolbar,
+            this.sessionId,
+            this.clientVersion,
+            this._sessionStartTime
         );
-        
+
         // Add to page init script for future navigations
         await page.addInitScript(toolbarScript);
-        
+
         // Execute immediately if page is already loaded
         if (page.url() && page.url() !== 'about:blank') {
           await page.evaluate(toolbarScript).catch(error => {
             testDebug('Error executing debug toolbar script on existing page:', error);
           });
         }
-        
+
         testDebug(`Debug toolbar auto-injected into page: ${page.url()}`);
       }
 
       // Inject custom code
       for (const injection of this.injectionConfig.customInjections) {
-        if (!injection.enabled || !injection.autoInject) {
+        if (!injection.enabled || !injection.autoInject)
           continue;
-        }
+
 
         try {
           const wrappedCode = wrapInjectedCode(
-            injection,
-            this.sessionId,
-            this.injectionConfig.debugToolbar.projectName
+              injection,
+              this.sessionId,
+              this.injectionConfig.debugToolbar.projectName
           );
           const injectionScript = generateInjectionScript(wrappedCode);
-          
+
           // Add to page init script
           await page.addInitScript(injectionScript);
-          
+
           // Execute immediately if page is already loaded
           if (page.url() && page.url() !== 'about:blank') {
             await page.evaluate(injectionScript).catch(error => {
               testDebug(`Error executing custom injection "${injection.name}" on existing page:`, error);
             });
           }
-          
+
           testDebug(`Custom injection "${injection.name}" auto-injected into page: ${page.url()}`);
         } catch (error) {
           testDebug(`Error injecting custom code "${injection.name}":`, error);

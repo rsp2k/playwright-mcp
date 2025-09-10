@@ -1,6 +1,21 @@
 /**
+ * Copyright (c) Microsoft Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
  * Code Injection Tools for MCP Client Identification and Custom Scripts
- * 
+ *
  * Provides tools for injecting debug toolbars and custom code into browser pages.
  * Designed for multi-client MCP environments where identifying which client
  * controls which browser window is essential.
@@ -47,7 +62,7 @@ export function generateDebugToolbarScript(config: DebugToolbarConfig, sessionId
   const projectName = config.projectName || 'MCP Client';
   const clientInfo = clientVersion ? `${clientVersion.name} v${clientVersion.version}` : 'Unknown Client';
   const startTime = sessionStartTime || Date.now();
-  
+
   return `
 /* BEGIN PLAYWRIGHT-MCP-DEBUG-TOOLBAR */
 /* This debug toolbar was injected by Playwright MCP server */
@@ -217,7 +232,7 @@ export function wrapInjectedCode(injection: CustomInjection, sessionId: string, 
 <!-- Session: ${sessionId}${projectInfo} -->
 <!-- This code was injected by Playwright MCP and should be ignored by LLMs -->`;
   const footer = `<!-- END PLAYWRIGHT-MCP-INJECTION: ${injection.name} -->`;
-  
+
   if (injection.type === 'javascript') {
     return `${header}
 <script>
@@ -233,7 +248,7 @@ ${injection.code}
 </style>
 ${footer}`;
   }
-  
+
   return `${header}
 ${injection.code}
 ${footer}`;
@@ -315,7 +330,7 @@ const enableDebugToolbar = defineTool({
   },
   handle: async (context: Context, params: z.output<typeof enableDebugToolbarSchema>, response: Response) => {
     testDebug('Enabling debug toolbar with params:', params);
-    
+
     const config: DebugToolbarConfig = {
       enabled: true,
       projectName: params.projectName || 'MCP Client',
@@ -325,7 +340,7 @@ const enableDebugToolbar = defineTool({
       showDetails: params.showDetails !== false,
       opacity: params.opacity || 0.9
     };
-    
+
     // Store config in context
     if (!context.injectionConfig) {
       context.injectionConfig = {
@@ -337,10 +352,10 @@ const enableDebugToolbar = defineTool({
       context.injectionConfig.debugToolbar = config;
       context.injectionConfig.enabled = true;
     }
-    
+
     // Generate toolbar script
     const toolbarScript = generateDebugToolbarScript(config, context.sessionId, context.clientVersion, (context as any)._sessionStartTime);
-    
+
     // Inject into current page if available
     const currentTab = context.currentTab();
     if (currentTab) {
@@ -352,7 +367,7 @@ const enableDebugToolbar = defineTool({
         testDebug('Error injecting toolbar into current page:', error);
       }
     }
-    
+
     const resultMessage = `Debug toolbar enabled for project "${config.projectName}"`;
     response.addResult(resultMessage);
     response.addResult(`Session ID: ${context.sessionId}`);
@@ -371,7 +386,7 @@ const injectCustomCode = defineTool({
   },
   handle: async (context: Context, params: z.output<typeof injectCustomCodeSchema>, response: Response) => {
     testDebug('Injecting custom code:', { name: params.name, type: params.type });
-    
+
     if (!context.injectionConfig) {
       context.injectionConfig = {
         debugToolbar: { enabled: false, minimized: false, showDetails: true, position: 'top-right', theme: 'dark', opacity: 0.9 },
@@ -379,7 +394,7 @@ const injectCustomCode = defineTool({
         enabled: true
       };
     }
-    
+
     // Create injection object
     const injection: CustomInjection = {
       id: `${params.name}_${Date.now()}`,
@@ -390,19 +405,19 @@ const injectCustomCode = defineTool({
       persistent: params.persistent !== false,
       autoInject: params.autoInject !== false
     };
-    
+
     // Remove any existing injection with the same name
     context.injectionConfig.customInjections = context.injectionConfig.customInjections.filter(
-      inj => inj.name !== params.name
+        inj => inj.name !== params.name
     );
-    
+
     // Add new injection
     context.injectionConfig.customInjections.push(injection);
-    
+
     // Wrap code with LLM-safe markers
     const wrappedCode = wrapInjectedCode(injection, context.sessionId, context.injectionConfig.debugToolbar.projectName);
     const injectionScript = generateInjectionScript(wrappedCode);
-    
+
     // Inject into current page if available
     const currentTab = context.currentTab();
     if (currentTab && injection.autoInject) {
@@ -414,7 +429,7 @@ const injectCustomCode = defineTool({
         testDebug('Error injecting custom code into current page:', error);
       }
     }
-    
+
     response.addResult(`Custom ${params.type} injection "${params.name}" added successfully`);
     response.addResult(`Total injections: ${context.injectionConfig.customInjections.length}`);
     response.addResult(`Auto-inject enabled: ${injection.autoInject}`);
@@ -432,12 +447,12 @@ const listInjections = defineTool({
   },
   handle: async (context: Context, params: any, response: Response) => {
     const config = context.injectionConfig;
-    
+
     if (!config) {
       response.addResult('No injection configuration found');
       return;
     }
-    
+
     response.addResult(`Session ID: ${context.sessionId}`);
     response.addResult(`\nDebug Toolbar:`);
     response.addResult(`- Enabled: ${config.debugToolbar.enabled}`);
@@ -447,7 +462,7 @@ const listInjections = defineTool({
       response.addResult(`- Theme: ${config.debugToolbar.theme}`);
       response.addResult(`- Minimized: ${config.debugToolbar.minimized}`);
     }
-    
+
     response.addResult(`\nCustom Injections (${config.customInjections.length}):`);
     if (config.customInjections.length === 0) {
       response.addResult('- None');
@@ -471,19 +486,19 @@ const disableDebugToolbar = defineTool({
     type: 'destructive',
   },
   handle: async (context: Context, params: any, response: Response) => {
-    if (context.injectionConfig) {
+    if (context.injectionConfig)
       context.injectionConfig.debugToolbar.enabled = false;
-    }
-    
+
+
     // Remove from current page if available
     const currentTab = context.currentTab();
     if (currentTab) {
       try {
         await currentTab.page.evaluate(() => {
           const toolbar = document.getElementById('playwright-mcp-debug-toolbar');
-          if (toolbar) {
+          if (toolbar)
             toolbar.remove();
-          }
+
           (window as any).playwrightMcpDebugToolbar = false;
         });
         testDebug('Debug toolbar removed from current page');
@@ -491,7 +506,7 @@ const disableDebugToolbar = defineTool({
         testDebug('Error removing toolbar from current page:', error);
       }
     }
-    
+
     response.addResult('Debug toolbar disabled');
   }
 });
@@ -510,22 +525,22 @@ const clearInjections = defineTool({
       response.addResult('No injections to clear');
       return;
     }
-    
+
     const clearedCount = context.injectionConfig.customInjections.length;
     context.injectionConfig.customInjections = [];
-    
+
     if (params.includeToolbar) {
       context.injectionConfig.debugToolbar.enabled = false;
-      
+
       // Remove toolbar from current page
       const currentTab = context.currentTab();
       if (currentTab) {
         try {
           await currentTab.page.evaluate(() => {
             const toolbar = document.getElementById('playwright-mcp-debug-toolbar');
-            if (toolbar) {
+            if (toolbar)
               toolbar.remove();
-            }
+
             (window as any).playwrightMcpDebugToolbar = false;
           });
         } catch (error) {
@@ -533,7 +548,7 @@ const clearInjections = defineTool({
         }
       }
     }
-    
+
     response.addResult(`Cleared ${clearedCount} custom injections${params.includeToolbar ? ' and disabled debug toolbar' : ''}`);
   }
 });

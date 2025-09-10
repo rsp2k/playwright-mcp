@@ -39,7 +39,7 @@ const configureSchema = z.object({
   colorScheme: z.enum(['light', 'dark', 'no-preference']).optional().describe('Preferred color scheme'),
   permissions: z.array(z.string()).optional().describe('Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])'),
   offline: z.boolean().optional().describe('Whether to emulate offline network conditions (equivalent to DevTools offline mode)'),
-  
+
   // Browser UI Customization Options
   chromiumSandbox: z.boolean().optional().describe('Enable/disable Chromium sandbox (affects browser appearance)'),
   slowMo: z.number().min(0).optional().describe('Slow down operations by specified milliseconds (helps with visual tracking)'),

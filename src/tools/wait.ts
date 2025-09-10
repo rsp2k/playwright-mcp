@@ -39,8 +39,8 @@ const wait = defineTool({
 
     // Handle smart recording for waits
     const recordingInfo = context.getVideoRecordingInfo();
-    const shouldPauseDuringWait = recordingInfo.enabled && 
-      recordingInfo.mode !== 'continuous' && 
+    const shouldPauseDuringWait = recordingInfo.enabled &&
+      recordingInfo.mode !== 'continuous' &&
       !params.recordDuringWait;
 
     if (shouldPauseDuringWait) {
@@ -76,9 +76,9 @@ const wait = defineTool({
     }
 
     response.addResult(`Waited for ${params.text || params.textGone || params.time}`);
-    if (params.recordDuringWait && recordingInfo.enabled) {
+    if (params.recordDuringWait && recordingInfo.enabled)
       response.addResult(`🎥 Video recording continued during wait`);
-    }
+
     response.setIncludeSnapshot();
   },
 });

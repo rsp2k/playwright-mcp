@@ -1,0 +1,31 @@
+services:
+  playwright-mcp:
+    build: .
+    container_name: playwright-mcp
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - HEADLESS=${HEADLESS:-false}
+      - DISPLAY=${DISPLAY:-}
+    command: ["--port", "8931", "--host", "0.0.0.0", "--browser", "chromium", "--no-sandbox"]
+    entrypoint: ["node", "cli.js"]
+    ports:
+      - "8931:8931"
+    labels:
+      caddy: ${DOMAIN}
+      caddy.reverse_proxy: "{{upstreams 8931}}"
+    networks:
+      - caddy
+    volumes:
+      - ./output:/tmp/playwright-mcp-output
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 8931"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  caddy:
+    external: true

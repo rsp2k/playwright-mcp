@@ -54,7 +54,7 @@ const startRecording = defineTool({
 
     // Default video size for better demos
     const videoSize = params.size || { width: 1280, height: 720 };
-    
+
     // Update context options to enable video recording
     const recordVideoOptions: any = {
       dir: videoDir,
@@ -62,7 +62,7 @@ const startRecording = defineTool({
     };
 
     // Automatically set viewport to match video size for full-frame content
-    if (params.autoSetViewport !== false) {
+    if (params.autoSetViewport) {
       try {
         await context.updateBrowserConfig({
           viewport: {
@@ -84,19 +84,19 @@ const startRecording = defineTool({
     response.addResult(`📁 Videos will be saved to: ${videoDir}`);
     response.addResult(`📝 Files will be named: ${baseFilename}-*.webm`);
     response.addResult(`📐 Video size: ${videoSize.width}x${videoSize.height}`);
-    
+
     // Show viewport matching info
-    if (params.autoSetViewport !== false) {
+    if (params.autoSetViewport) {
       response.addResult(`🖼️  Browser viewport matched to video size for full-frame content`);
     } else {
       response.addResult(`⚠️  Viewport not automatically set - you may see gray borders around content`);
       response.addResult(`💡 For full-frame content, use: browser_configure({viewport: {width: ${videoSize.width}, height: ${videoSize.height}}})`);
     }
-    
+
     // Show current recording mode
     const recordingInfo = context.getVideoRecordingInfo();
     response.addResult(`🎯 Recording mode: ${recordingInfo.mode}`);
-    
+
     switch (recordingInfo.mode) {
       case 'smart':
         response.addResult(`🧠 Smart mode: Auto-pauses during waits, resumes during actions`);
@@ -112,7 +112,7 @@ const startRecording = defineTool({
         response.addResult(`🎞️ Segment mode: Creating separate files for each action sequence`);
         break;
     }
-    
+
     response.addResult(`\n📋 Next steps:`);
     response.addResult(`1. Navigate to pages and perform browser actions`);
     response.addResult(`2. Use browser_stop_recording when finished to save videos`);
@@ -179,11 +179,11 @@ const getRecordingStatus = defineTool({
       response.addResult('1. Use browser_start_recording to enable recording');
       response.addResult('2. Navigate to pages and perform actions');
       response.addResult('3. Use browser_stop_recording to save videos');
-      
+
       // Show potential artifact locations for debugging
       const registry = ArtifactManagerRegistry.getInstance();
       const artifactManager = context.sessionId ? registry.getManager(context.sessionId) : undefined;
-      
+
       if (artifactManager) {
         const baseDir = artifactManager.getBaseDirectory();
         const sessionDir = artifactManager.getSessionDirectory();
@@ -195,7 +195,7 @@ const getRecordingStatus = defineTool({
         response.addResult(`\n⚠️  No artifact manager configured - videos will save to default output directory`);
         response.addResult(`📁 Default output: ${path.join(context.config.outputDir, 'videos')}`);
       }
-      
+
       return;
     }
 
@@ -209,23 +209,23 @@ const getRecordingStatus = defineTool({
 
     response.addResult(`🎬 Active recordings: ${recordingInfo.activeRecordings}`);
     response.addResult(`🎯 Recording mode: ${recordingInfo.mode}`);
-    
-    if (recordingInfo.paused) {
+
+    if (recordingInfo.paused)
       response.addResult(`⏸️ Status: PAUSED (${recordingInfo.pausedRecordings} recordings stored)`);
-    } else {
+    else
       response.addResult(`▶️ Status: RECORDING`);
-    }
-    
-    if (recordingInfo.mode === 'segment') {
+
+
+    if (recordingInfo.mode === 'segment')
       response.addResult(`🎞️ Current segment: ${recordingInfo.currentSegment}`);
-    }
+
 
     // Show helpful path info for MCP clients
     const outputDir = recordingInfo.config?.dir;
     if (outputDir) {
       const absolutePath = path.resolve(outputDir);
       response.addResult(`📍 Absolute path: ${absolutePath}`);
-      
+
       // Check if directory exists and show contents
       const fs = await import('fs');
       if (fs.existsSync(absolutePath)) {
@@ -249,7 +249,7 @@ const getRecordingStatus = defineTool({
     // Show debug information
     const registry = ArtifactManagerRegistry.getInstance();
     const artifactManager = context.sessionId ? registry.getManager(context.sessionId) : undefined;
-    
+
     if (artifactManager) {
       response.addResult(`\n🔍 Debug Info:`);
       response.addResult(`🆔 Session ID: ${context.sessionId}`);
@@ -313,13 +313,13 @@ const revealArtifactPaths = defineTool({
           const files = items.filter(item => item.isFile()).map(item => item.name);
           const dirs = items.filter(item => item.isDirectory()).map(item => item.name);
 
-          if (dirs.length > 0) {
+          if (dirs.length > 0)
             response.addResult(`\n📂 Existing subdirectories: ${dirs.join(', ')}`);
-          }
 
-          if (files.length > 0) {
+
+          if (files.length > 0)
             response.addResult(`📄 Files in session directory: ${files.join(', ')}`);
-          }
+
 
           // Count .webm files across all subdirectories
           let webmCount = 0;
@@ -328,11 +328,11 @@ const revealArtifactPaths = defineTool({
               const contents = fs.readdirSync(dir, { withFileTypes: true });
               for (const item of contents) {
                 const fullPath = path.join(dir, item.name);
-                if (item.isDirectory()) {
+                if (item.isDirectory())
                   countWebmFiles(fullPath);
-                } else if (item.name.endsWith('.webm')) {
+                else if (item.name.endsWith('.webm'))
                   webmCount++;
-                }
+
               }
             } catch (error) {
               // Ignore permission errors
@@ -340,9 +340,9 @@ const revealArtifactPaths = defineTool({
           }
           countWebmFiles(sessionDir);
 
-          if (webmCount > 0) {
+          if (webmCount > 0)
             response.addResult(`🎬 Total .webm video files found: ${webmCount}`);
-          }
+
         } catch (error: any) {
           response.addResult(`⚠️  Could not list session directory contents: ${error.message}`);
         }
@@ -383,9 +383,9 @@ const pauseRecording = defineTool({
   handle: async (context, params, response) => {
     const result = await context.pauseVideoRecording();
     response.addResult(`⏸️ ${result.message}`);
-    if (result.paused > 0) {
+    if (result.paused > 0)
       response.addResult(`💡 Use browser_resume_recording to continue`);
-    }
+
   },
 });
 
@@ -421,9 +421,9 @@ const setRecordingMode = defineTool({
 
   handle: async (context, params, response) => {
     context.setVideoRecordingMode(params.mode);
-    
+
     response.addResult(`🎬 Video recording mode set to: ${params.mode}`);
-    
+
     switch (params.mode) {
       case 'continuous':
         response.addResult('📹 Will record everything continuously (traditional behavior)');
@@ -441,7 +441,7 @@ const setRecordingMode = defineTool({
         response.addResult('💡 Useful for breaking demos into individual clips');
         break;
     }
-    
+
     const recordingInfo = context.getVideoRecordingInfo();
     if (recordingInfo.enabled) {
       response.addResult(`\n🎥 Current recording status: ${recordingInfo.paused ? 'paused' : 'active'}`);

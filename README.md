@@ -529,6 +529,15 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_clear_injections**
+  - Title: Clear Injections
+  - Description: Remove all custom code injections (keeps debug toolbar)
+  - Parameters:
+    - `includeToolbar` (boolean, optional): Also disable debug toolbar
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_clear_requests**
   - Title: Clear captured requests
   - Description: Clear all captured HTTP request data from memory. Useful for freeing up memory during long sessions or when starting fresh analysis.
@@ -571,6 +580,10 @@ http.createServer(async (req, res) => {
     - `colorScheme` (string, optional): Preferred color scheme
     - `permissions` (array, optional): Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])
     - `offline` (boolean, optional): Whether to emulate offline network conditions (equivalent to DevTools offline mode)
+    - `chromiumSandbox` (boolean, optional): Enable/disable Chromium sandbox (affects browser appearance)
+    - `slowMo` (number, optional): Slow down operations by specified milliseconds (helps with visual tracking)
+    - `devtools` (boolean, optional): Open browser with DevTools panel open (Chromium only)
+    - `args` (array, optional): Additional browser launch arguments for UI customization (e.g., ["--force-color-profile=srgb", "--disable-features=VizDisplayCompositor"])
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -606,6 +619,14 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_disable_debug_toolbar**
+  - Title: Disable Debug Toolbar
+  - Description: Disable the debug toolbar for the current session
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_dismiss_all_file_choosers**
   - Title: Dismiss all file choosers
   - Description: Dismiss/cancel all open file chooser dialogs without uploading files. Useful when multiple file choosers are stuck open. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).
@@ -630,6 +651,20 @@ http.createServer(async (req, res) => {
     - `startRef` (string): Exact source element reference from the page snapshot
     - `endElement` (string): Human-readable target element description used to obtain the permission to interact with the element
     - `endRef` (string): Exact target element reference from the page snapshot
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_enable_debug_toolbar**
+  - Title: Enable Debug Toolbar
+  - Description: Enable the debug toolbar to identify which MCP client is controlling the browser
+  - Parameters:
+    - `projectName` (string, optional): Name of your project/client to display in the toolbar
+    - `position` (string, optional): Position of the toolbar on screen
+    - `theme` (string, optional): Visual theme for the toolbar
+    - `minimized` (boolean, optional): Start toolbar in minimized state
+    - `showDetails` (boolean, optional): Show session details in expanded view
+    - `opacity` (number, optional): Toolbar opacity
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -709,6 +744,19 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_inject_custom_code**
+  - Title: Inject Custom Code
+  - Description: Inject custom JavaScript or CSS code into all pages in the current session
+  - Parameters:
+    - `name` (string): Unique name for this injection
+    - `type` (string): Type of code to inject
+    - `code` (string): The JavaScript or CSS code to inject
+    - `persistent` (boolean, optional): Keep injection active across session restarts
+    - `autoInject` (boolean, optional): Automatically inject on every new page
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_install_extension**
   - Title: Install Chrome extension
   - Description: Install a Chrome extension in the current browser session. Only works with Chromium browser. For best results, use pure Chromium without the "chrome" channel. The extension must be an unpacked directory containing manifest.json.
@@ -740,6 +788,14 @@ http.createServer(async (req, res) => {
 - **browser_list_extensions**
   - Title: List installed Chrome extensions
   - Description: List all Chrome extensions currently installed in the browser session. Only works with Chromium browser.
+  - Parameters: None
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_list_injections**
+  - Title: List Injections
+  - Description: List all active code injections for the current session
   - Parameters: None
   - Read-only: **true**
 
@@ -779,6 +835,14 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_pause_recording**
+  - Title: Pause video recording
+  - Description: Manually pause the current video recording to eliminate dead time between actions. Useful for creating professional demo videos. In smart recording mode, pausing happens automatically during waits. Use browser_resume_recording to continue recording.
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_press_key**
   - Title: Press a key
   - Description: Press a key on the keyboard. Returns page snapshot after keypress (configurable via browser_configure_snapshots).
@@ -814,6 +878,22 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_resume_recording**
+  - Title: Resume video recording
+  - Description: Manually resume previously paused video recording. New video segments will capture subsequent browser actions. In smart recording mode, resuming happens automatically when browser actions begin. Useful for precise control over recording timing in demo videos.
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_reveal_artifact_paths**
+  - Title: Reveal artifact storage paths
+  - Description: Show where artifacts (videos, screenshots, etc.) are stored, including resolved absolute paths. Useful for debugging when you cannot find generated files.
+  - Parameters: None
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_select_option**
   - Title: Select option
   - Description: Select an option in a dropdown. Returns page snapshot after selection (configurable via browser_configure_snapshots).
@@ -834,6 +914,19 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_set_recording_mode**
+  - Title: Set video recording mode
+  - Description: Configure intelligent video recording behavior for professional demo videos. Choose from continuous recording, smart auto-pause/resume, action-only capture, or segmented recording. Smart mode is recommended for marketing demos as it eliminates dead time automatically.
+  - Parameters:
+    - `mode` (string): Video recording behavior mode:
+• continuous: Record everything continuously including waits (traditional behavior, may have dead time)
+• smart: Automatically pause during waits, resume during actions (RECOMMENDED for clean demo videos)
+• action-only: Only record during active browser interactions, minimal recording time
+• segment: Create separate video files for each action sequence (useful for splitting demos into clips)
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_snapshot**
   - Title: Page snapshot
   - Description: Capture complete accessibility snapshot of the current page. Always returns full snapshot regardless of session snapshot configuration. Better than screenshot for understanding page structure.
@@ -844,10 +937,11 @@ http.createServer(async (req, res) => {
 
 - **browser_start_recording**
   - Title: Start video recording
-  - Description: Start recording browser session video. This must be called BEFORE performing browser actions you want to record. New browser contexts will be created with video recording enabled. Videos are automatically saved when pages/contexts close.
+  - Description: Start recording browser session video with intelligent viewport matching. For best results, the browser viewport size should match the video recording size to avoid gray space around content. Use browser_configure to set viewport size before recording.
   - Parameters:
-    - `size` (object, optional): Video recording size
+    - `size` (object, optional): Video recording dimensions. IMPORTANT: Browser viewport should match these dimensions to avoid gray borders around content.
     - `filename` (string, optional): Base filename for video files (default: session-{timestamp}.webm)
+    - `autoSetViewport` (boolean, optional): Automatically set browser viewport to match video recording size (recommended for full-frame content)
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -867,7 +961,7 @@ http.createServer(async (req, res) => {
 
 - **browser_stop_recording**
   - Title: Stop video recording
-  - Description: Stop video recording and return the paths to recorded video files. This closes all active pages to ensure videos are properly saved. Call this when you want to finalize and access the recorded videos.
+  - Description: Finalize video recording session and return paths to all recorded video files (.webm format). Automatically closes browser pages to ensure videos are properly saved and available for use. Essential final step for completing video recording workflows and accessing demo files.
   - Parameters: None
   - Read-only: **true**
 
@@ -911,11 +1005,12 @@ http.createServer(async (req, res) => {
 
 - **browser_wait_for**
   - Title: Wait for
-  - Description: Wait for text to appear or disappear or a specified time to pass. Returns page snapshot after waiting (configurable via browser_configure_snapshots).
+  - Description: Wait for text to appear or disappear or a specified time to pass. In smart recording mode, video recording is automatically paused during waits unless recordDuringWait is true.
   - Parameters:
     - `time` (number, optional): The time to wait in seconds
     - `text` (string, optional): The text to wait for
     - `textGone` (string, optional): The text to wait for to disappear
+    - `recordDuringWait` (boolean, optional): Whether to keep video recording active during the wait (default: false in smart mode, true in continuous mode)
   - Read-only: **true**
 
 </details>

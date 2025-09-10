@@ -1,0 +1,13 @@
+node_modules
+lib
+output
+.git
+.env
+docker-compose.yml
+README.md
+CLAUDE.md
+*.log
+.DS_Store
+.vscode
+tests
+coverage

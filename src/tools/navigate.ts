@@ -33,7 +33,7 @@ const navigate = defineTool({
   handle: async (context, params, response) => {
     // Smart recording: Begin action
     await context.beginVideoAction('navigate');
-    
+
     const tab = await context.ensureTab();
     await tab.navigate(params.url);
 
