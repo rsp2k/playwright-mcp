@@ -16,6 +16,7 @@
 
 import { z } from 'zod';
 import { defineTool } from './tool.js';
+import { paginationParamsSchema, withPagination } from '../pagination.js';
 import { RequestInterceptorOptions } from '../requestInterceptor.js';
 import type { Context } from '../context.js';
 
@@ -37,7 +38,7 @@ const startMonitoringSchema = z.object({
   outputPath: z.string().optional().describe('Custom output directory path. If not specified, uses session artifact directory')
 });
 
-const getRequestsSchema = z.object({
+const getRequestsSchema = paginationParamsSchema.extend({
   filter: z.enum(['all', 'failed', 'slow', 'errors', 'success']).optional().default('all').describe('Filter requests by type: all, failed (network failures), slow (>1s), errors (4xx/5xx), success (2xx/3xx)'),
 
   domain: z.string().optional().describe('Filter requests by domain hostname'),
@@ -45,8 +46,6 @@ const getRequestsSchema = z.object({
   method: z.string().optional().describe('Filter requests by HTTP method (GET, POST, etc.)'),
 
   status: z.number().optional().describe('Filter requests by HTTP status code'),
-
-  limit: z.number().optional().default(100).describe('Maximum number of requests to return (default: 100)'),
 
   format: z.enum(['summary', 'detailed', 'stats']).optional().default('summary').describe('Response format: summary (basic info), detailed (full data), stats (statistics only)'),
 
@@ -167,7 +166,7 @@ const getRequests = defineTool({
   schema: {
     name: 'browser_get_requests',
     title: 'Get captured requests',
-    description: 'Retrieve and analyze captured HTTP requests with advanced filtering. Shows timing, status codes, headers, and bodies. Perfect for identifying performance issues, failed requests, or analyzing API usage patterns.',
+    description: 'Retrieve and analyze captured HTTP requests with pagination support. Shows timing, status codes, headers, and bodies. Large request lists are automatically paginated for better performance.',
     inputSchema: getRequestsSchema,
     type: 'readOnly',
   },
@@ -182,49 +181,8 @@ const getRequests = defineTool({
         return;
       }
 
-      let requests = interceptor.getData();
-
-      // Apply filters
-      if (params.filter !== 'all') {
-        switch (params.filter) {
-          case 'failed':
-            requests = interceptor.getFailedRequests();
-            break;
-          case 'slow':
-            requests = interceptor.getSlowRequests(params.slowThreshold);
-            break;
-          case 'errors':
-            requests = requests.filter(r => r.response && r.response.status >= 400);
-            break;
-          case 'success':
-            requests = requests.filter(r => r.response && r.response.status < 400);
-            break;
-        }
-      }
-
-      if (params.domain) {
-        requests = requests.filter(r => {
-          try {
-            return new URL(r.url).hostname === params.domain;
-          } catch {
-            return false;
-          }
-        });
-      }
-
-      if (params.method)
-        requests = requests.filter(r => r.method.toLowerCase() === params.method!.toLowerCase());
-
-
-      if (params.status)
-        requests = requests.filter(r => r.response?.status === params.status);
-
-
-      // Limit results
-      const limitedRequests = requests.slice(0, params.limit);
-
+      // Special case for stats format - no pagination needed
       if (params.format === 'stats') {
-        // Return statistics only
         const stats = interceptor.getStats();
         response.addResult('📊 **Request Statistics**');
         response.addResult('');
@@ -255,50 +213,90 @@ const getRequests = defineTool({
         return;
       }
 
-      // Return request data
-      if (limitedRequests.length === 0) {
-        response.addResult('ℹ️ **No requests found matching the criteria**');
-        response.addResult('');
-        response.addResult('💡 Try different filters or ensure the page has made HTTP requests');
-        return;
-      }
+      // Use pagination for request data
+      await withPagination(
+        'browser_get_requests',
+        params,
+        context,
+        response,
+        {
+          maxResponseTokens: 8000,
+          defaultPageSize: 25, // Smaller default for detailed request data
+          dataExtractor: async () => {
+            let requests = interceptor.getData();
 
-      response.addResult(`📋 **Captured Requests (${limitedRequests.length} of ${requests.length} total)**`);
-      response.addResult('');
+            // Apply filters
+            if (params.filter !== 'all') {
+              switch (params.filter) {
+                case 'failed':
+                  requests = interceptor.getFailedRequests();
+                  break;
+                case 'slow':
+                  requests = interceptor.getSlowRequests(params.slowThreshold);
+                  break;
+                case 'errors':
+                  requests = requests.filter(r => r.response && r.response.status >= 400);
+                  break;
+                case 'success':
+                  requests = requests.filter(r => r.response && r.response.status < 400);
+                  break;
+              }
+            }
 
-      limitedRequests.forEach((req, index) => {
-        const duration = req.duration ? `${req.duration}ms` : 'pending';
-        const status = req.failed ? 'FAILED' : req.response?.status || 'pending';
-        const size = req.response?.bodySize ? ` (${(req.response.bodySize / 1024).toFixed(1)}KB)` : '';
+            if (params.domain) {
+              requests = requests.filter(r => {
+                try {
+                  return new URL(r.url).hostname === params.domain;
+                } catch {
+                  return false;
+                }
+              });
+            }
 
-        response.addResult(`**${index + 1}. ${req.method} ${status}** - ${duration}`);
-        response.addResult(`   ${req.url}${size}`);
+            if (params.method)
+              requests = requests.filter(r => r.method.toLowerCase() === params.method!.toLowerCase());
 
-        if (params.format === 'detailed') {
-          response.addResult(`   📅 ${req.timestamp}`);
-          if (req.response) {
-            response.addResult(`   📊 Status: ${req.response.status} ${req.response.statusText}`);
-            response.addResult(`   ⏱️  Duration: ${req.response.duration}ms`);
-            response.addResult(`   🔄 From Cache: ${req.response.fromCache ? 'Yes' : 'No'}`);
+            if (params.status)
+              requests = requests.filter(r => r.response?.status === params.status);
 
-            // Show key headers
-            const contentType = req.response.headers['content-type'];
-            if (contentType)
-              response.addResult(`   📄 Content-Type: ${contentType}`);
+            return requests;
+          },
+          itemFormatter: (req, format) => {
+            const duration = req.duration ? `${req.duration}ms` : 'pending';
+            const status = req.failed ? 'FAILED' : req.response?.status || 'pending';
+            const size = req.response?.bodySize ? ` (${(req.response.bodySize / 1024).toFixed(1)}KB)` : '';
 
-          }
+            let result = `**${req.method} ${status}** - ${duration}\n   ${req.url}${size}`;
 
-          if (req.failed && req.failure)
-            response.addResult(`   ❌ Failure: ${req.failure.errorText}`);
+            if (format === 'detailed') {
+              result += `\n   📅 ${req.timestamp}`;
+              if (req.response) {
+                result += `\n   📊 Status: ${req.response.status} ${req.response.statusText}`;
+                result += `\n   ⏱️  Duration: ${req.response.duration}ms`;
+                result += `\n   🔄 From Cache: ${req.response.fromCache ? 'Yes' : 'No'}`;
 
+                // Show key headers
+                const contentType = req.response.headers['content-type'];
+                if (contentType)
+                  result += `\n   📄 Content-Type: ${contentType}`;
+              }
 
-          response.addResult('');
+              if (req.failed && req.failure)
+                result += `\n   ❌ Failure: ${req.failure.errorText}`;
+
+              result += '\n';
+            }
+
+            return result;
+          },
+          sessionIdExtractor: () => context.sessionId,
+          positionCalculator: (items, lastIndex) => ({
+            lastIndex,
+            totalItems: items.length,
+            timestamp: Date.now()
+          })
         }
-      });
-
-      if (requests.length > params.limit)
-        response.addResult(`💡 Showing first ${params.limit} results. Use higher limit or specific filters to see more.`);
-
+      );
 
     } catch (error: any) {
       throw new Error(`Failed to get requests: ${error.message}`);
