@@ -23,6 +23,7 @@ export const paginationParamsSchema = z.object({
   limit: z.number().min(1).max(1000).optional().default(50).describe('Maximum items per page (1-1000)'),
   cursor_id: z.string().optional().describe('Continue from previous page using cursor ID'),
   session_id: z.string().optional().describe('Session identifier for cursor isolation'),
+  return_all: z.boolean().optional().default(false).describe('Return entire response bypassing pagination (WARNING: may produce very large responses)'),
 });
 
 export type PaginationParams = z.infer<typeof paginationParamsSchema>;
@@ -228,6 +229,11 @@ export async function withPagination<TParams extends Record<string, any>, TData>
   // Extract all data
   const allData = await options.dataExtractor(context, params);
   
+  // Check for bypass option - return complete dataset with warnings
+  if (params.return_all) {
+    return await handleBypassPagination(toolName, params, allData, options, startTime, response);
+  }
+  
   // Detect if this is a fresh query or cursor continuation
   const isFreshQuery = !params.cursor_id;
   
@@ -393,4 +399,73 @@ async function handleCursorContinuation<TParams extends Record<string, any>, TDa
     response.addResult(`⚠️ Pagination error: ${error}. Starting fresh query...\n`);
     await handleFreshQuery(toolName, params, context, response, allData, options, sessionId, startTime);
   }
+}
+
+async function handleBypassPagination<TParams extends Record<string, any>, TData>(
+  toolName: string,
+  params: TParams & PaginationParams,
+  allData: TData[],
+  options: PaginationGuardOptions<TData>,
+  startTime: number,
+  response: Response
+): Promise<void> {
+  const fetchTimeMs = Date.now() - startTime;
+  
+  // Format all items for token estimation
+  const formattedItems = allData.map(item => options.itemFormatter(item, (params as any).format));
+  const fullResponse = formattedItems.join('\n');
+  const estimatedTokens = Math.ceil(fullResponse.length / 4);
+  
+  // Create comprehensive warning based on response size
+  let warningLevel = '💡';
+  let warningText = 'Large response';
+  
+  if (estimatedTokens > 50000) {
+    warningLevel = '🚨';
+    warningText = 'EXTREMELY LARGE response';
+  } else if (estimatedTokens > 20000) {
+    warningLevel = '⚠️';
+    warningText = 'VERY LARGE response';
+  } else if (estimatedTokens > 8000) {
+    warningLevel = '⚠️';
+    warningText = 'Large response';
+  }
+  
+  const maxTokens = options.maxResponseTokens || 8000;
+  const exceedsThreshold = estimatedTokens > maxTokens;
+  
+  // Build warning message
+  const warningMessage = 
+    `${warningLevel} **PAGINATION BYPASSED** - ${warningText} (~${estimatedTokens.toLocaleString()} tokens)\n\n` +
+    `**⚠️ WARNING: This response may:**\n` +
+    `• Fill up context rapidly (${Math.ceil(estimatedTokens / 1000)}k+ tokens)\n` +
+    `• Cause client performance issues\n` +
+    `• Be truncated by MCP client limits\n` +
+    `• Impact subsequent conversation quality\n\n` +
+    (exceedsThreshold ? 
+      `**💡 RECOMMENDATION:**\n` +
+      `• Use pagination: \`${toolName}({...same_params, return_all: false, limit: ${Math.min(50, Math.floor(maxTokens * 50 / estimatedTokens))}})\`\n` +
+      `• Apply filters to reduce dataset size\n` +
+      `• Consider using cursor navigation for exploration\n\n` :
+      `This response size is manageable but still large.\n\n`) +
+    `**📊 Dataset: ${allData.length} items** (${fetchTimeMs}ms fetch time)\n`;
+  
+  
+  // Add warning header
+  response.addResult(warningMessage);
+  
+  // Add all formatted items
+  formattedItems.forEach(item => {
+    response.addResult(item);
+  });
+  
+  // Add summary footer
+  response.addResult(
+    `\n**📋 COMPLETE DATASET DELIVERED**\n` +
+    `• Items: ${allData.length} (all)\n` +
+    `• Tokens: ~${estimatedTokens.toLocaleString()}\n` +
+    `• Fetch Time: ${fetchTimeMs}ms\n` +
+    `• Status: ✅ No pagination applied\n\n` +
+    `💡 **Next time**: Use \`return_all: false\` for paginated navigation`
+  );
 }
