@@ -76,7 +76,13 @@ const installPopularExtensionSchema = z.object({
     'colorzilla',
     'json-viewer',
     'web-developer',
-    'whatfont'
+    'whatfont',
+    'ublock-origin',
+    'octotree',
+    'grammarly',
+    'lastpass',
+    'metamask',
+    'postman'
   ]).describe('Popular extension to install automatically'),
   version: z.string().optional().describe('Specific version to install (defaults to latest)')
 });
@@ -682,8 +688,9 @@ export default [
 type GitHubSource = {
   type: 'github';
   repo: string;
-  path: string;
+  path?: string;
   branch: string;
+  buildPath?: string;
 };
 
 type DemoSource = {
@@ -694,7 +701,10 @@ type DemoSource = {
 type CrxSource = {
   type: 'crx';
   crxId: string;
-  fallback: string;
+  fallback?: 'github' | 'demo' | 'built-in';
+  repo?: string;
+  branch?: string;
+  path?: string;
 };
 
 type ExtensionSource = GitHubSource | DemoSource | CrxSource;
@@ -725,31 +735,79 @@ async function downloadAndPrepareExtension(extension: string, targetDir: string,
       fallback: 'built-in'
     },
     'axe-devtools': {
-      type: 'demo',
-      name: 'Axe DevTools Demo'
+      type: 'github',
+      repo: 'dequelabs/axe-devtools-html-api',
+      branch: 'develop',
+      path: 'browser-extension'
     },
     'colorzilla': {
-      type: 'demo',
-      name: 'ColorZilla Demo'
+      type: 'crx',
+      crxId: 'bhlhnicpbhignbdhedgjhgdocnmhomnp',
+      fallback: 'github',
+      repo: 'kkapsner/ColorZilla',
+      branch: 'master'
     },
     'json-viewer': {
-      type: 'demo',
-      name: 'JSON Viewer Demo'
+      type: 'github',
+      repo: 'tulios/json-viewer',
+      branch: 'master',
+      buildPath: 'extension'
     },
     'web-developer': {
-      type: 'demo',
-      name: 'Web Developer Demo'
+      type: 'crx',
+      crxId: 'bfbameneiokkgbdmiekhjnmfkcnldhhm',
+      fallback: 'github',
+      repo: 'chrispederick/web-developer',
+      branch: 'master',
+      path: 'source'
     },
     'whatfont': {
-      type: 'demo',
-      name: 'WhatFont Demo'
+      type: 'crx',
+      crxId: 'jabopobgcpjmedljpbcaablpmlmfcogm',
+      fallback: 'github',
+      repo: 'chengyinliu/WhatFont-Bookmarklet',
+      branch: 'master'
+    },
+    'ublock-origin': {
+      type: 'github',
+      repo: 'gorhill/uBlock',
+      branch: 'master',
+      path: 'dist/build/uBlock0.chromium'
+    },
+    'octotree': {
+      type: 'crx',
+      crxId: 'bkhaagjahfmjljalopjnoealnfndnagc',
+      fallback: 'github',
+      repo: 'ovity/octotree',
+      branch: 'master'
+    },
+    'grammarly': {
+      type: 'crx',
+      crxId: 'kbfnbcaeplbcioakkpcpgfkobkghlhen',
+      fallback: 'demo'
+    },
+    'lastpass': {
+      type: 'crx', 
+      crxId: 'hdokiejnpimakedhajhdlcegeplioahd',
+      fallback: 'demo'
+    },
+    'metamask': {
+      type: 'github',
+      repo: 'MetaMask/metamask-extension',
+      branch: 'develop',
+      path: 'dist/chrome'
+    },
+    'postman': {
+      type: 'crx',
+      crxId: 'fhbjgbiflinjbdggehcddcbncdddomop',
+      fallback: 'demo'
     }
   };
 
   const config = extensionSources[extension];
 
   if (config.type === 'github')
-    await downloadFromGitHub(config.repo, config.path, config.branch, targetDir, response);
+    await downloadFromGitHub(config.repo, config.path || '', config.branch, targetDir, response);
   else if (config.type === 'demo')
     await createDemoExtension(config.name, extension, targetDir);
   else
@@ -853,7 +911,42 @@ if (window.__REDUX_DEVTOOLS_EXTENSION__ || window.Redux) {
   \`;
   indicator.textContent = '🔴 Redux DevTools';
   document.body.appendChild(indicator);
-}`
+}`,
+    'ublock-origin': `
+// uBlock Origin ad blocker functionality
+console.log('🛡️ uBlock Origin loaded!');
+const indicator = document.createElement('div');
+indicator.style.cssText = \`
+  position: fixed; top: 150px; right: 10px; background: #c62d42; color: white;
+  padding: 8px 12px; border-radius: 8px; font-family: monospace; font-size: 12px;
+  font-weight: bold; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+\`;
+indicator.textContent = '🛡️ uBlock Origin';
+document.body.appendChild(indicator);`,
+    'octotree': `
+// Octotree GitHub code tree functionality
+if (window.location.hostname === 'github.com') {
+  console.log('🐙 Octotree GitHub enhancer loaded!');
+  const indicator = document.createElement('div');
+  indicator.style.cssText = \`
+    position: fixed; top: 180px; right: 10px; background: #24292e; color: white;
+    padding: 8px 12px; border-radius: 8px; font-family: monospace; font-size: 12px;
+    font-weight: bold; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  \`;
+  indicator.textContent = '🐙 Octotree';
+  document.body.appendChild(indicator);
+}`,
+    'metamask': `
+// MetaMask wallet functionality
+console.log('🦊 MetaMask wallet loaded!');
+const indicator = document.createElement('div');
+indicator.style.cssText = \`
+  position: fixed; top: 210px; right: 10px; background: #f6851b; color: white;
+  padding: 8px 12px; border-radius: 8px; font-family: monospace; font-size: 12px;
+  font-weight: bold; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+\`;
+indicator.textContent = '🦊 MetaMask';
+document.body.appendChild(indicator);`
   };
 
   return baseScript + (typeSpecificScripts[type] || '');
@@ -864,6 +957,14 @@ function generatePopupHTML(name: string, type: string): string {
     'react-devtools': { bg: '#61dafb', text: '#20232a', emoji: '⚛️' },
     'vue-devtools': { bg: '#4fc08d', text: 'white', emoji: '💚' },
     'redux-devtools': { bg: '#764abc', text: 'white', emoji: '🔴' },
+    'ublock-origin': { bg: '#c62d42', text: 'white', emoji: '🛡️' },
+    'octotree': { bg: '#24292e', text: 'white', emoji: '🐙' },
+    'metamask': { bg: '#f6851b', text: 'white', emoji: '🦊' },
+    'json-viewer': { bg: '#2196f3', text: 'white', emoji: '📋' },
+    'web-developer': { bg: '#4caf50', text: 'white', emoji: '🔧' },
+    'axe-devtools': { bg: '#9c27b0', text: 'white', emoji: '♿' },
+    'colorzilla': { bg: '#ff9800', text: 'white', emoji: '🎨' },
+    'whatfont': { bg: '#607d8b', text: 'white', emoji: '🔤' },
     'default': { bg: '#333', text: 'white', emoji: '🔧' }
   };
 
