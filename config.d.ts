@@ -145,6 +145,15 @@ export type Config = {
   differentialSnapshots?: boolean;
 
   /**
+   * Type of differential analysis when differential snapshots are enabled.
+   * - 'semantic': React-style reconciliation with actionable elements
+   * - 'simple': Basic text diff comparison  
+   * - 'both': Show both methods for comparison
+   * Default is 'semantic'.
+   */
+  differentialMode?: 'semantic' | 'simple' | 'both';
+
+  /**
    * File path to write browser console output to. When specified, all console
    * messages from browser pages will be written to this file in real-time.
    * Useful for debugging and monitoring browser activity.

@@ -7,7 +7,13 @@ A Model Context Protocol (MCP) server that provides browser automation capabilit
 - **Fast and lightweight**. Uses Playwright's accessibility tree, not pixel-based input.
 - **LLM-friendly**. No vision models needed, operates purely on structured data.
 - **Deterministic tool application**. Avoids ambiguity common with screenshot-based approaches.
-- **Multi-client identification**. Debug toolbar and code injection system for managing parallel MCP clients.
+- **🤖 AI-Human Collaboration System**. Direct JavaScript communication between models and users with `mcpNotify`, `mcpPrompt`, and interactive element selection via `mcpInspector`.
+- **🎯 Multi-client identification**. Professional floating debug toolbar with themes to identify which MCP client controls the browser in multi-client environments.
+- **📊 Advanced HTTP monitoring**. Comprehensive request/response interception with headers, bodies, timing analysis, and export to HAR/CSV formats.
+- **🎬 Intelligent video recording**. Smart pause/resume modes eliminate dead time for professional demo videos with automatic viewport matching.
+- **🎨 Custom code injection**. Inject JavaScript/CSS into pages for enhanced automation, with memory-leak-free cleanup and session persistence.
+- **📁 Centralized artifact management**. Session-based organization of screenshots, videos, and PDFs with comprehensive audit logging.
+- **🔧 Enterprise-ready**. Memory leak prevention, comprehensive error handling, and production-tested browser automation patterns.
 
 ### Requirements
 - Node.js 18 or newer
@@ -183,6 +189,8 @@ Playwright MCP server supports following arguments. They can be provided in the 
   --differential-snapshots        enable differential snapshots that only show
                                   changes since the last snapshot instead of
                                   full page snapshots.
+  --no-differential-snapshots     disable differential snapshots and always
+                                  return full page snapshots.
   --no-sandbox                    disable the sandbox for all process types that
                                   are normally sandboxed.
   --output-dir <path>             path to the directory for output files.
@@ -550,6 +558,9 @@ http.createServer(async (req, res) => {
 - **browser_click**
   - Title: Click
   - Description: Perform click on a web page. Returns page snapshot after click (configurable via browser_configure_snapshots). Use browser_snapshot for explicit full snapshots.
+
+🤖 MODELS: Use mcpNotify.info('message'), mcpPrompt('question?'), and 
+mcpInspector.start('click element', callback) for user collaboration.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -607,15 +618,31 @@ http.createServer(async (req, res) => {
     - `includeSnapshots` (boolean, optional): Enable/disable automatic snapshots after interactive operations. When false, use browser_snapshot for explicit snapshots.
     - `maxSnapshotTokens` (number, optional): Maximum tokens allowed in snapshots before truncation. Use 0 to disable truncation.
     - `differentialSnapshots` (boolean, optional): Enable differential snapshots that show only changes since last snapshot instead of full page snapshots.
+    - `differentialMode` (string, optional): Type of differential analysis: "semantic" (React-style reconciliation), "simple" (text diff), or "both" (show comparison).
     - `consoleOutputFile` (string, optional): File path to write browser console output to. Set to empty string to disable console file output.
+    - `filterPattern` (string, optional): Ripgrep pattern to filter differential changes (regex supported). Examples: "button.*submit", "TypeError|ReferenceError", "form.*validation"
+    - `filterFields` (array, optional): Specific fields to search within. Examples: ["element.text", "element.attributes", "console.message", "url"]. Defaults to element and console fields.
+    - `filterMode` (string, optional): Type of filtering output: "content" (filtered data), "count" (match statistics), "files" (matching items only)
+    - `caseSensitive` (boolean, optional): Case sensitive pattern matching (default: true)
+    - `wholeWords` (boolean, optional): Match whole words only (default: false)
+    - `contextLines` (number, optional): Number of context lines around matches
+    - `invertMatch` (boolean, optional): Invert match to show non-matches (default: false)
+    - `maxMatches` (number, optional): Maximum number of matches to return
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
 - **browser_console_messages**
   - Title: Get console messages
-  - Description: Returns all console messages
-  - Parameters: None
+  - Description: Returns console messages with pagination support. Large message lists are automatically paginated for better performance.
+  - Parameters:
+    - `limit` (number, optional): Maximum items per page (1-1000)
+    - `cursor_id` (string, optional): Continue from previous page using cursor ID
+    - `session_id` (string, optional): Session identifier for cursor isolation
+    - `return_all` (boolean, optional): Return entire response bypassing pagination (WARNING: may produce very large responses)
+    - `level_filter` (string, optional): Filter messages by level
+    - `source_filter` (string, optional): Filter messages by source
+    - `search` (string, optional): Search text within console messages
   - Read-only: **true**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -657,15 +684,46 @@ http.createServer(async (req, res) => {
 <!-- NOTE: This has been generated via update-readme.js -->
 
 - **browser_enable_debug_toolbar**
-  - Title: Enable Debug Toolbar
-  - Description: Enable the debug toolbar to identify which MCP client is controlling the browser
+  - Title: Enable Modern Debug Toolbar
+  - Description: Enable a modern floating pill toolbar with excellent contrast and professional design to identify which MCP client controls the browser
   - Parameters:
-    - `projectName` (string, optional): Name of your project/client to display in the toolbar
-    - `position` (string, optional): Position of the toolbar on screen
-    - `theme` (string, optional): Visual theme for the toolbar
-    - `minimized` (boolean, optional): Start toolbar in minimized state
-    - `showDetails` (boolean, optional): Show session details in expanded view
-    - `opacity` (number, optional): Toolbar opacity
+    - `projectName` (string, optional): Name of your project/client to display in the floating pill toolbar
+    - `position` (string, optional): Position of the floating pill on screen (default: top-right)
+    - `theme` (string, optional): Visual theme: light (white), dark (gray), transparent (glass effect)
+    - `minimized` (boolean, optional): Start in compact pill mode (default: false)
+    - `showDetails` (boolean, optional): Show session details when expanded (default: true)
+    - `opacity` (number, optional): Toolbar opacity 0.1-1.0 (default: 0.95)
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_enable_voice_collaboration**
+  - Title: Enable Voice Collaboration
+  - Description: 🎤 REVOLUTIONARY: Enable conversational browser automation with voice communication!
+
+**Transform browser automation into natural conversation:**
+• AI speaks to you in real-time during automation
+• Respond with your voice instead of typing
+• Interactive decision-making during tasks
+• "Hey Claude, what should I click?" → AI guides you with voice
+
+**Features:**
+• Native browser Web Speech API (no external services)
+• Automatic microphone permission handling  
+• Intelligent fallbacks when voice unavailable
+• Real-time collaboration during automation tasks
+
+**Example Usage:**
+AI: "I found a login form. What credentials should I use?" 🗣️
+You: "Use my work email and check password manager" 🎤
+AI: "Perfect! Logging you in now..." 🗣️
+
+This is the FIRST conversational browser automation MCP server!
+  - Parameters:
+    - `enabled` (boolean, optional): Enable voice collaboration features (default: true)
+    - `autoInitialize` (boolean, optional): Automatically initialize voice on page load (default: true)
+    - `voiceOptions` (object, optional): Voice synthesis options
+    - `listenOptions` (object, optional): Voice recognition options
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -673,6 +731,16 @@ http.createServer(async (req, res) => {
 - **browser_evaluate**
   - Title: Evaluate JavaScript
   - Description: Evaluate JavaScript expression on page or element. Returns page snapshot after evaluation (configurable via browser_configure_snapshots).
+
+🤖 COLLABORATION API AVAILABLE:
+After running this tool, models can use JavaScript to communicate with users:
+- mcpNotify.info('message'), mcpNotify.success(), mcpNotify.warning(), mcpNotify.error() for messages
+- await mcpPrompt('Should I proceed?') for user confirmations  
+- mcpInspector.start('click element', callback) for interactive element selection
+
+Example: await page.evaluate(() => mcpNotify.success('Task completed!'));
+
+Full API: See MODEL-COLLABORATION-API.md
   - Parameters:
     - `function` (string): () => { /* code */ } or (element) => { /* code */ } when element is provided
     - `element` (string, optional): Human-readable element description used to obtain permission to interact with the element
@@ -712,13 +780,16 @@ http.createServer(async (req, res) => {
 
 - **browser_get_requests**
   - Title: Get captured requests
-  - Description: Retrieve and analyze captured HTTP requests with advanced filtering. Shows timing, status codes, headers, and bodies. Perfect for identifying performance issues, failed requests, or analyzing API usage patterns.
+  - Description: Retrieve and analyze captured HTTP requests with pagination support. Shows timing, status codes, headers, and bodies. Large request lists are automatically paginated for better performance.
   - Parameters:
+    - `limit` (number, optional): Maximum items per page (1-1000)
+    - `cursor_id` (string, optional): Continue from previous page using cursor ID
+    - `session_id` (string, optional): Session identifier for cursor isolation
+    - `return_all` (boolean, optional): Return entire response bypassing pagination (WARNING: may produce very large responses)
     - `filter` (string, optional): Filter requests by type: all, failed (network failures), slow (>1s), errors (4xx/5xx), success (2xx/3xx)
     - `domain` (string, optional): Filter requests by domain hostname
     - `method` (string, optional): Filter requests by HTTP method (GET, POST, etc.)
     - `status` (number, optional): Filter requests by HTTP status code
-    - `limit` (number, optional): Maximum number of requests to return (default: 100)
     - `format` (string, optional): Response format: summary (basic info), detailed (full data), stats (statistics only)
     - `slowThreshold` (number, optional): Threshold in milliseconds for considering requests "slow" (default: 1000ms)
   - Read-only: **true**
@@ -748,6 +819,20 @@ http.createServer(async (req, res) => {
 - **browser_inject_custom_code**
   - Title: Inject Custom Code
   - Description: Inject custom JavaScript or CSS code into all pages in the current session
+
+🤖 COLLABORATION API AVAILABLE:
+Models can inject JavaScript that communicates directly with users:
+• mcpNotify.info('message') - Send info to user
+• mcpNotify.success('completed!') - Show success  
+• mcpNotify.warning('be careful') - Display warnings
+• mcpNotify.error('something failed') - Show errors
+• await mcpPrompt('Shall I proceed?') - Get user confirmation
+• mcpInspector.start('Click the login button', callback) - Interactive element selection
+
+When elements are ambiguous or actions need confirmation, use these functions 
+to collaborate with the user for better automation results.
+
+Full API: See MODEL-COLLABORATION-API.md
   - Parameters:
     - `name` (string): Unique name for this injection
     - `type` (string): Type of code to inject
@@ -802,9 +887,62 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_mcp_theme_create**
+  - Title: Create custom MCP theme
+  - Description: Create a new custom theme for MCP client identification
+  - Parameters:
+    - `id` (string): Unique theme identifier
+    - `name` (string): Human-readable theme name
+    - `description` (string): Theme description
+    - `baseTheme` (string, optional): Base theme to extend
+    - `variables` (object, optional): CSS custom properties to override
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_mcp_theme_get**
+  - Title: Get current MCP theme
+  - Description: Get details about the currently active MCP theme
+  - Parameters:
+    - `includeVariables` (boolean, optional): Include CSS variables in response
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_mcp_theme_list**
+  - Title: List MCP themes
+  - Description: List all available MCP client identification themes
+  - Parameters:
+    - `filter` (string, optional): Filter themes by type
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_mcp_theme_reset**
+  - Title: Reset MCP theme
+  - Description: Reset MCP client identification to default minimal theme
+  - Parameters:
+    - `clearStorage` (boolean, optional): Clear stored theme preferences
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_mcp_theme_set**
+  - Title: Set MCP theme
+  - Description: Apply a theme to the MCP client identification toolbar
+  - Parameters:
+    - `themeId` (string): Theme identifier to apply
+    - `persist` (boolean, optional): Whether to persist theme preference
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_navigate**
   - Title: Navigate to a URL
   - Description: Navigate to a URL. Returns page snapshot after navigation (configurable via browser_configure_snapshots).
+
+🤖 MODELS: Use mcpNotify.info('message'), mcpPrompt('question?'), and 
+mcpInspector.start('click element', callback) for user collaboration.
   - Parameters:
     - `url` (string): The URL to navigate to
   - Read-only: **false**
@@ -1076,36 +1214,78 @@ http.createServer(async (req, res) => {
 
 - **browser_mouse_click_xy**
   - Title: Click
-  - Description: Click left mouse button at a given position
+  - Description: Click mouse button at a given position with advanced options
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `x` (number): X coordinate
     - `y` (number): Y coordinate
+    - `precision` (string, optional): Coordinate precision level
+    - `delay` (number, optional): Delay in milliseconds before action
+    - `button` (string, optional): Mouse button to click
+    - `clickCount` (number, optional): Number of clicks (1=single, 2=double, 3=triple)
+    - `holdTime` (number, optional): How long to hold button down in milliseconds
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
 - **browser_mouse_drag_xy**
   - Title: Drag mouse
-  - Description: Drag left mouse button to a given position
+  - Description: Drag mouse button from start to end position with advanced drag patterns
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `startX` (number): Start X coordinate
     - `startY` (number): Start Y coordinate
     - `endX` (number): End X coordinate
     - `endY` (number): End Y coordinate
+    - `button` (string, optional): Mouse button to drag with
+    - `precision` (string, optional): Coordinate precision level
+    - `pattern` (string, optional): Drag movement pattern
+    - `steps` (number, optional): Number of intermediate steps for smooth/bezier patterns
+    - `duration` (number, optional): Total drag duration in milliseconds
+    - `delay` (number, optional): Delay before starting drag
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_mouse_gesture_xy**
+  - Title: Mouse gesture
+  - Description: Perform complex mouse gestures with multiple waypoints
+  - Parameters:
+    - `element` (string): Human-readable element description used to obtain permission to interact with the element
+    - `points` (array): Array of points defining the gesture path
+    - `button` (string, optional): Mouse button for click actions
+    - `precision` (string, optional): Coordinate precision level
+    - `smoothPath` (boolean, optional): Smooth the path between points
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
 - **browser_mouse_move_xy**
   - Title: Move mouse
-  - Description: Move mouse to a given position
+  - Description: Move mouse to a given position with optional precision and timing control
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `x` (number): X coordinate
     - `y` (number): Y coordinate
+    - `precision` (string, optional): Coordinate precision level
+    - `delay` (number, optional): Delay in milliseconds before action
   - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_mouse_scroll_xy**
+  - Title: Scroll at coordinates
+  - Description: Perform scroll action at specific coordinates with precision control
+  - Parameters:
+    - `element` (string): Human-readable element description used to obtain permission to interact with the element
+    - `x` (number): X coordinate
+    - `y` (number): Y coordinate
+    - `precision` (string, optional): Coordinate precision level
+    - `delay` (number, optional): Delay in milliseconds before action
+    - `deltaX` (number, optional): Horizontal scroll amount (positive = right, negative = left)
+    - `deltaY` (number): Vertical scroll amount (positive = down, negative = up)
+    - `smooth` (boolean, optional): Use smooth scrolling animation
+  - Read-only: **false**
 
 </details>
 

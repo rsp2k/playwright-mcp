@@ -42,6 +42,8 @@ export type CLIOptions = {
   includeSnapshots?: boolean;
   maxSnapshotTokens?: number;
   differentialSnapshots?: boolean;
+  differentialMode?: 'semantic' | 'simple' | 'both';
+  noDifferentialSnapshots?: boolean;
   sandbox?: boolean;
   outputDir?: string;
   port?: number;
@@ -76,6 +78,7 @@ const defaultConfig: FullConfig = {
   includeSnapshots: true,
   maxSnapshotTokens: 10000,
   differentialSnapshots: false,
+  differentialMode: 'semantic' as const,
 };
 
 type BrowserUserConfig = NonNullable<Config['browser']>;
@@ -93,6 +96,7 @@ export type FullConfig = Config & {
   includeSnapshots: boolean;
   maxSnapshotTokens: number;
   differentialSnapshots: boolean;
+  differentialMode: 'semantic' | 'simple' | 'both';
   consoleOutputFile?: string;
 };
 
@@ -212,7 +216,8 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
     imageResponses: cliOptions.imageResponses,
     includeSnapshots: cliOptions.includeSnapshots,
     maxSnapshotTokens: cliOptions.maxSnapshotTokens,
-    differentialSnapshots: cliOptions.differentialSnapshots,
+    differentialSnapshots: cliOptions.noDifferentialSnapshots ? false : cliOptions.differentialSnapshots,
+    differentialMode: cliOptions.differentialMode || 'semantic',
     consoleOutputFile: cliOptions.consoleOutputFile,
   };
 

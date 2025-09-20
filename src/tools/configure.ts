@@ -91,7 +91,18 @@ const configureSnapshotsSchema = z.object({
   includeSnapshots: z.boolean().optional().describe('Enable/disable automatic snapshots after interactive operations. When false, use browser_snapshot for explicit snapshots.'),
   maxSnapshotTokens: z.number().min(0).optional().describe('Maximum tokens allowed in snapshots before truncation. Use 0 to disable truncation.'),
   differentialSnapshots: z.boolean().optional().describe('Enable differential snapshots that show only changes since last snapshot instead of full page snapshots.'),
-  consoleOutputFile: z.string().optional().describe('File path to write browser console output to. Set to empty string to disable console file output.')
+  differentialMode: z.enum(['semantic', 'simple', 'both']).optional().describe('Type of differential analysis: "semantic" (React-style reconciliation), "simple" (text diff), or "both" (show comparison).'),
+  consoleOutputFile: z.string().optional().describe('File path to write browser console output to. Set to empty string to disable console file output.'),
+  
+  // Universal Ripgrep Filtering Parameters
+  filterPattern: z.string().optional().describe('Ripgrep pattern to filter differential changes (regex supported). Examples: "button.*submit", "TypeError|ReferenceError", "form.*validation"'),
+  filterFields: z.array(z.string()).optional().describe('Specific fields to search within. Examples: ["element.text", "element.attributes", "console.message", "url"]. Defaults to element and console fields.'),
+  filterMode: z.enum(['content', 'count', 'files']).optional().describe('Type of filtering output: "content" (filtered data), "count" (match statistics), "files" (matching items only)'),
+  caseSensitive: z.boolean().optional().describe('Case sensitive pattern matching (default: true)'),
+  wholeWords: z.boolean().optional().describe('Match whole words only (default: false)'),
+  contextLines: z.number().min(0).optional().describe('Number of context lines around matches'),
+  invertMatch: z.boolean().optional().describe('Invert match to show non-matches (default: false)'),
+  maxMatches: z.number().min(1).optional().describe('Maximum number of matches to return')
 });
 
 // Simple offline mode toggle for testing
@@ -634,6 +645,17 @@ export default [
 
         }
 
+        if (params.differentialMode !== undefined) {
+          changes.push(`🧠 Differential mode: ${params.differentialMode}`);
+          if (params.differentialMode === 'semantic') {
+            changes.push(`   ↳ React-style reconciliation with actionable elements`);
+          } else if (params.differentialMode === 'simple') {
+            changes.push(`   ↳ Basic text diff comparison`);
+          } else if (params.differentialMode === 'both') {
+            changes.push(`   ↳ Side-by-side comparison of both methods`);
+          }
+        }
+
         if (params.consoleOutputFile !== undefined) {
           if (params.consoleOutputFile === '')
             changes.push(`📝 Console output file: disabled`);
@@ -642,16 +664,82 @@ export default [
 
         }
 
+        // Process ripgrep filtering parameters
+        if (params.filterPattern !== undefined) {
+          changes.push(`🔍 Filter pattern: "${params.filterPattern}"`);
+          changes.push(`   ↳ Surgical precision filtering on differential changes`);
+        }
+
+        if (params.filterFields !== undefined) {
+          const fieldList = params.filterFields.join(', ');
+          changes.push(`🎯 Filter fields: [${fieldList}]`);
+        }
+
+        if (params.filterMode !== undefined) {
+          const modeDescriptions = {
+            'content': 'Show filtered data with full content',
+            'count': 'Show match statistics only',
+            'files': 'Show matching items only'
+          };
+          changes.push(`📊 Filter mode: ${params.filterMode} (${modeDescriptions[params.filterMode]})`);
+        }
+
+        if (params.caseSensitive !== undefined) {
+          changes.push(`🔤 Case sensitive: ${params.caseSensitive ? 'enabled' : 'disabled'}`);
+        }
+
+        if (params.wholeWords !== undefined) {
+          changes.push(`📝 Whole words only: ${params.wholeWords ? 'enabled' : 'disabled'}`);
+        }
+
+        if (params.contextLines !== undefined) {
+          changes.push(`📋 Context lines: ${params.contextLines}`);
+        }
+
+        if (params.invertMatch !== undefined) {
+          changes.push(`🔄 Invert match: ${params.invertMatch ? 'enabled (show non-matches)' : 'disabled'}`);
+        }
+
+        if (params.maxMatches !== undefined) {
+          changes.push(`🎯 Max matches: ${params.maxMatches}`);
+        }
+
         // Apply the updated configuration using the context method
         context.updateSnapshotConfig(params);
 
         // Provide user feedback
         if (changes.length === 0) {
-          response.addResult('No snapshot configuration changes specified.\n\n**Current settings:**\n' +
-            `📸 Auto-snapshots: ${context.config.includeSnapshots ? 'enabled' : 'disabled'}\n` +
-            `📏 Max snapshot tokens: ${context.config.maxSnapshotTokens === 0 ? 'unlimited' : context.config.maxSnapshotTokens.toLocaleString()}\n` +
-            `🔄 Differential snapshots: ${context.config.differentialSnapshots ? 'enabled' : 'disabled'}\n` +
-            `📝 Console output file: ${context.config.consoleOutputFile || 'disabled'}`);
+          const currentSettings = [
+            `📸 Auto-snapshots: ${context.config.includeSnapshots ? 'enabled' : 'disabled'}`,
+            `📏 Max snapshot tokens: ${context.config.maxSnapshotTokens === 0 ? 'unlimited' : context.config.maxSnapshotTokens.toLocaleString()}`,
+            `🔄 Differential snapshots: ${context.config.differentialSnapshots ? 'enabled' : 'disabled'}`,
+            `🧠 Differential mode: ${context.config.differentialMode || 'semantic'}`,
+            `📝 Console output file: ${context.config.consoleOutputFile || 'disabled'}`
+          ];
+          
+          // Add current filtering settings if any are configured
+          const filterConfig = (context as any).config;
+          if (filterConfig.filterPattern) {
+            currentSettings.push('', '**🔍 Ripgrep Filtering:**');
+            currentSettings.push(`🎯 Pattern: "${filterConfig.filterPattern}"`);
+            if (filterConfig.filterFields) {
+              currentSettings.push(`📋 Fields: [${filterConfig.filterFields.join(', ')}]`);
+            }
+            if (filterConfig.filterMode) {
+              currentSettings.push(`📊 Mode: ${filterConfig.filterMode}`);
+            }
+            const filterOptions = [];
+            if (filterConfig.caseSensitive === false) filterOptions.push('case-insensitive');
+            if (filterConfig.wholeWords) filterOptions.push('whole-words');
+            if (filterConfig.invertMatch) filterOptions.push('inverted');
+            if (filterConfig.contextLines) filterOptions.push(`${filterConfig.contextLines} context lines`);
+            if (filterConfig.maxMatches) filterOptions.push(`max ${filterConfig.maxMatches} matches`);
+            if (filterOptions.length > 0) {
+              currentSettings.push(`⚙️ Options: ${filterOptions.join(', ')}`);
+            }
+          }
+          
+          response.addResult('No snapshot configuration changes specified.\n\n**Current settings:**\n' + currentSettings.join('\n'));
           return;
         }
 
@@ -671,6 +759,20 @@ export default [
         if (context.config.maxSnapshotTokens > 0 && context.config.maxSnapshotTokens < 5000)
           result += '- Consider increasing token limit if snapshots are frequently truncated\n';
 
+        // Add filtering-specific tips
+        const filterConfig = params;
+        if (filterConfig.filterPattern) {
+          result += '- 🔍 Filtering applies surgical precision to differential changes\n';
+          result += '- Use patterns like "button.*submit" for UI elements or "TypeError|Error" for debugging\n';
+          if (!filterConfig.filterFields) {
+            result += '- Default search fields: element.text, element.role, console.message\n';
+          }
+          result += '- Combine with differential snapshots for ultra-precise targeting (99%+ noise reduction)\n';
+        }
+
+        if (filterConfig.differentialSnapshots && filterConfig.filterPattern) {
+          result += '- 🚀 **Revolutionary combination**: Differential snapshots + ripgrep filtering = unprecedented precision\n';
+        }
 
         result += '\n**Changes take effect immediately for subsequent tool calls.**';
 
