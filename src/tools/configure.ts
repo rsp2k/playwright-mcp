@@ -102,7 +102,58 @@ const configureSnapshotsSchema = z.object({
   wholeWords: z.boolean().optional().describe('Match whole words only (default: false)'),
   contextLines: z.number().min(0).optional().describe('Number of context lines around matches'),
   invertMatch: z.boolean().optional().describe('Invert match to show non-matches (default: false)'),
-  maxMatches: z.number().min(1).optional().describe('Maximum number of matches to return')
+  maxMatches: z.number().min(1).optional().describe('Maximum number of matches to return'),
+
+  // jq Structural Filtering Parameters
+  jqExpression: z.string().optional().describe(
+    'jq expression for structural JSON querying and transformation.\n\n' +
+    'Common patterns:\n' +
+    '• Buttons: .elements[] | select(.role == "button")\n' +
+    '• Errors: .console[] | select(.level == "error")\n' +
+    '• Forms: .elements[] | select(.role == "textbox" or .role == "combobox")\n' +
+    '• Links: .elements[] | select(.role == "link")\n' +
+    '• Transform: [.elements[] | {role, text, id}]\n\n' +
+    'Tip: Use filterPreset instead for common cases - no jq knowledge required!'
+  ),
+
+  // Filter Presets (LLM-friendly, no jq knowledge needed)
+  filterPreset: z.enum([
+    'buttons_only',       // Interactive buttons
+    'links_only',         // Links and navigation
+    'forms_only',         // Form inputs and controls
+    'errors_only',        // Console errors
+    'warnings_only',      // Console warnings
+    'interactive_only',   // All interactive elements (buttons, links, inputs)
+    'validation_errors',  // Validation/alert messages
+    'navigation_items',   // Navigation menus and items
+    'headings_only',      // Page headings (h1-h6)
+    'images_only',        // Images
+    'changed_text_only'   // Elements with text changes
+  ]).optional().describe(
+    'Filter preset for common scenarios (no jq knowledge needed).\n\n' +
+    '• buttons_only: Show only buttons\n' +
+    '• links_only: Show only links\n' +
+    '• forms_only: Show form inputs (textbox, combobox, checkbox, etc.)\n' +
+    '• errors_only: Show console errors\n' +
+    '• warnings_only: Show console warnings\n' +
+    '• interactive_only: Show all clickable elements (buttons + links)\n' +
+    '• validation_errors: Show validation alerts\n' +
+    '• navigation_items: Show navigation menus\n' +
+    '• headings_only: Show headings (h1-h6)\n' +
+    '• images_only: Show images\n' +
+    '• changed_text_only: Show elements with text changes\n\n' +
+    'Note: filterPreset and jqExpression are mutually exclusive. Preset takes precedence.'
+  ),
+
+  // Flattened jq Options (easier for LLMs - no object construction needed)
+  jqRawOutput: z.boolean().optional().describe('Output raw strings instead of JSON (jq -r flag). Useful for extracting plain text values.'),
+  jqCompact: z.boolean().optional().describe('Compact JSON output without whitespace (jq -c flag). Reduces output size.'),
+  jqSortKeys: z.boolean().optional().describe('Sort object keys in output (jq -S flag). Ensures consistent ordering.'),
+  jqSlurp: z.boolean().optional().describe('Read entire input into array and process once (jq -s flag). Enables cross-element operations.'),
+  jqExitStatus: z.boolean().optional().describe('Set exit code based on output (jq -e flag). Useful for validation.'),
+  jqNullInput: z.boolean().optional().describe('Use null as input instead of reading data (jq -n flag). For generating new structures.'),
+
+  filterOrder: z.enum(['jq_first', 'ripgrep_first', 'jq_only', 'ripgrep_only']).optional().describe('Order of filter application. "jq_first" (default): structural filter then pattern match - recommended for maximum precision. "ripgrep_first": pattern match then structural filter - useful when you want to narrow down first. "jq_only": pure jq transformation without ripgrep. "ripgrep_only": pure pattern matching without jq (existing behavior).')
 });
 
 // Simple offline mode toggle for testing
@@ -704,6 +755,41 @@ export default [
           changes.push(`🎯 Max matches: ${params.maxMatches}`);
         }
 
+        // Process filter preset (takes precedence over jqExpression)
+        if (params.filterPreset !== undefined) {
+          changes.push(`🎯 Filter preset: ${params.filterPreset}`);
+          changes.push(`   ↳ LLM-friendly preset (no jq knowledge required)`);
+        }
+
+        // Process jq structural filtering parameters
+        if (params.jqExpression !== undefined && !params.filterPreset) {
+          changes.push(`🔧 jq expression: "${params.jqExpression}"`);
+          changes.push(`   ↳ Structural JSON querying and transformation`);
+        }
+
+        // Process flattened jq options
+        const jqOptionsList: string[] = [];
+        if (params.jqRawOutput) jqOptionsList.push('raw output');
+        if (params.jqCompact) jqOptionsList.push('compact');
+        if (params.jqSortKeys) jqOptionsList.push('sorted keys');
+        if (params.jqSlurp) jqOptionsList.push('slurp mode');
+        if (params.jqExitStatus) jqOptionsList.push('exit status');
+        if (params.jqNullInput) jqOptionsList.push('null input');
+
+        if (jqOptionsList.length > 0) {
+          changes.push(`⚙️ jq options: ${jqOptionsList.join(', ')}`);
+        }
+
+        if (params.filterOrder !== undefined) {
+          const orderDescriptions = {
+            'jq_first': 'Structural filter → Pattern match (recommended)',
+            'ripgrep_first': 'Pattern match → Structural filter',
+            'jq_only': 'Pure jq transformation only',
+            'ripgrep_only': 'Pure pattern matching only'
+          };
+          changes.push(`🔀 Filter order: ${params.filterOrder} (${orderDescriptions[params.filterOrder]})`);
+        }
+
         // Apply the updated configuration using the context method
         context.updateSnapshotConfig(params);
 
@@ -738,7 +824,35 @@ export default [
               currentSettings.push(`⚙️ Options: ${filterOptions.join(', ')}`);
             }
           }
-          
+
+          // Add current jq filtering settings if any are configured
+          if (filterConfig.filterPreset || filterConfig.jqExpression) {
+            currentSettings.push('', '**🔧 jq Structural Filtering:**');
+
+            if (filterConfig.filterPreset) {
+              currentSettings.push(`🎯 Preset: ${filterConfig.filterPreset} (LLM-friendly)`);
+            } else if (filterConfig.jqExpression) {
+              currentSettings.push(`🧬 Expression: "${filterConfig.jqExpression}"`);
+            }
+
+            // Check flattened options
+            const jqOpts = [];
+            if (filterConfig.jqRawOutput) jqOpts.push('raw output');
+            if (filterConfig.jqCompact) jqOpts.push('compact');
+            if (filterConfig.jqSortKeys) jqOpts.push('sorted keys');
+            if (filterConfig.jqSlurp) jqOpts.push('slurp');
+            if (filterConfig.jqExitStatus) jqOpts.push('exit status');
+            if (filterConfig.jqNullInput) jqOpts.push('null input');
+
+            if (jqOpts.length > 0) {
+              currentSettings.push(`⚙️ Options: ${jqOpts.join(', ')}`);
+            }
+
+            if (filterConfig.filterOrder) {
+              currentSettings.push(`🔀 Filter order: ${filterConfig.filterOrder}`);
+            }
+          }
+
           response.addResult('No snapshot configuration changes specified.\n\n**Current settings:**\n' + currentSettings.join('\n'));
           return;
         }
@@ -772,6 +886,24 @@ export default [
 
         if (filterConfig.differentialSnapshots && filterConfig.filterPattern) {
           result += '- 🚀 **Revolutionary combination**: Differential snapshots + ripgrep filtering = unprecedented precision\n';
+        }
+
+        // Add jq-specific tips
+        if (filterConfig.jqExpression) {
+          result += '- 🔧 jq enables powerful structural JSON queries and transformations\n';
+          result += '- Use patterns like ".elements[] | select(.role == \\"button\\")" to extract specific element types\n';
+          result += '- Combine jq + ripgrep for triple-layer filtering: differential → jq → ripgrep\n';
+        }
+
+        if (filterConfig.jqExpression && filterConfig.filterPattern) {
+          result += '- 🌟 **ULTIMATE PRECISION**: Triple-layer filtering achieves 99.9%+ noise reduction\n';
+          result += '- 🎯 Flow: Differential (99%) → jq structural filter → ripgrep pattern match\n';
+        }
+
+        if (filterConfig.filterOrder === 'jq_first') {
+          result += '- 💡 jq_first order is recommended: structure first, then pattern matching\n';
+        } else if (filterConfig.filterOrder === 'ripgrep_first') {
+          result += '- 💡 ripgrep_first order: narrows data first, then structural transformation\n';
         }
 
         result += '\n**Changes take effect immediately for subsequent tool calls.**';

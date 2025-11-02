@@ -1,21 +1,26 @@
 /**
  * TypeScript Ripgrep Filter Engine for Playwright MCP.
- * 
+ *
  * High-performance filtering engine adapted from MCPlaywright's proven architecture
  * to work with our differential snapshot system and TypeScript/Node.js environment.
+ *
+ * Now with jq integration for ultimate filtering power: structural queries + text patterns.
  */
 
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { 
-    UniversalFilterParams, 
-    FilterResult, 
-    FilterMode, 
-    DifferentialFilterResult, 
-    DifferentialFilterParams 
+import {
+    UniversalFilterParams,
+    FilterResult,
+    FilterMode,
+    DifferentialFilterResult,
+    DifferentialFilterParams,
+    JqFilterResult,
+    FilterPreset
 } from './models.js';
+import { JqEngine, type JqOptions } from './jqEngine.js';
 import type { AccessibilityDiff } from '../context.js';
 
 interface FilterableItem {
@@ -34,12 +39,36 @@ interface RipgrepResult {
 export class PlaywrightRipgrepEngine {
     private tempDir: string;
     private createdFiles: Set<string> = new Set();
-    
+    private jqEngine: JqEngine;
+
     constructor() {
         this.tempDir = join(tmpdir(), 'playwright-mcp-filtering');
+        this.jqEngine = new JqEngine();
         this.ensureTempDir();
     }
-    
+
+    /**
+     * Convert filter preset to jq expression
+     * LLM-friendly presets that don't require jq knowledge
+     */
+    static presetToExpression(preset: FilterPreset): string {
+        const presetMap: Record<FilterPreset, string> = {
+            'buttons_only': '.elements[] | select(.role == "button")',
+            'links_only': '.elements[] | select(.role == "link")',
+            'forms_only': '.elements[] | select(.role == "textbox" or .role == "combobox" or .role == "checkbox" or .role == "radio" or .role == "searchbox" or .role == "spinbutton")',
+            'errors_only': '.console[] | select(.level == "error")',
+            'warnings_only': '.console[] | select(.level == "warning")',
+            'interactive_only': '.elements[] | select(.role == "button" or .role == "link" or .role == "textbox" or .role == "combobox" or .role == "checkbox" or .role == "radio" or .role == "searchbox")',
+            'validation_errors': '.elements[] | select(.role == "alert" or .attributes.role == "alert")',
+            'navigation_items': '.elements[] | select(.role == "navigation" or .role == "menuitem" or .role == "tab")',
+            'headings_only': '.elements[] | select(.role == "heading")',
+            'images_only': '.elements[] | select(.role == "img" or .role == "image")',
+            'changed_text_only': '.elements[] | select(.text_changed == true or (.previous_text and .current_text and (.previous_text != .current_text)))'
+        };
+
+        return presetMap[preset];
+    }
+
     private async ensureTempDir(): Promise<void> {
         try {
             await fs.mkdir(this.tempDir, { recursive: true });
@@ -104,6 +133,140 @@ export class PlaywrightRipgrepEngine {
         };
     }
     
+    /**
+     * ULTIMATE FILTERING: Combine jq structural queries with ripgrep pattern matching.
+     * This is the revolutionary triple-layer filtering system.
+     */
+    async filterDifferentialChangesWithJq(
+        changes: AccessibilityDiff,
+        filterParams: DifferentialFilterParams,
+        originalSnapshot?: string
+    ): Promise<JqFilterResult> {
+        const totalStartTime = Date.now();
+        const filterOrder = filterParams.filter_order || 'jq_first';
+
+        // Track performance for each stage
+        let jqTime = 0;
+        let ripgrepTime = 0;
+        let jqReduction = 0;
+        let ripgrepReduction = 0;
+
+        let currentData: any = changes;
+        let jqExpression: string | undefined;
+
+        // Resolve jq expression from preset or direct expression
+        let actualJqExpression: string | undefined;
+        if (filterParams.filter_preset) {
+            // Preset takes precedence
+            actualJqExpression = PlaywrightRipgrepEngine.presetToExpression(filterParams.filter_preset);
+        } else if (filterParams.jq_expression) {
+            actualJqExpression = filterParams.jq_expression;
+        }
+
+        // Build jq options from flattened params (prefer flattened over nested)
+        const jqOptions: JqOptions = {
+            raw_output: filterParams.jq_raw_output ?? filterParams.jq_options?.raw_output,
+            compact: filterParams.jq_compact ?? filterParams.jq_options?.compact,
+            sort_keys: filterParams.jq_sort_keys ?? filterParams.jq_options?.sort_keys,
+            slurp: filterParams.jq_slurp ?? filterParams.jq_options?.slurp,
+            exit_status: filterParams.jq_exit_status ?? filterParams.jq_options?.exit_status,
+            null_input: filterParams.jq_null_input ?? filterParams.jq_options?.null_input
+        };
+
+        // Stage 1: Apply filters based on order
+        if (filterOrder === 'jq_only' || filterOrder === 'jq_first') {
+            // Apply jq structural filtering
+            if (actualJqExpression) {
+                const jqStart = Date.now();
+                const jqResult = await this.jqEngine.query(
+                    currentData,
+                    actualJqExpression,
+                    jqOptions
+                );
+                jqTime = jqResult.performance.execution_time_ms;
+                jqReduction = jqResult.performance.reduction_percent;
+                jqExpression = jqResult.expression_used;
+                currentData = jqResult.data;
+            }
+        }
+
+        // Stage 2: Apply ripgrep if needed
+        let ripgrepResult: DifferentialFilterResult | undefined;
+        if (filterOrder === 'ripgrep_only' || (filterOrder === 'jq_first' && filterParams.filter_pattern)) {
+            const rgStart = Date.now();
+            ripgrepResult = await this.filterDifferentialChanges(
+                currentData,
+                filterParams,
+                originalSnapshot
+            );
+            ripgrepTime = Date.now() - rgStart;
+            currentData = ripgrepResult.filtered_data;
+            ripgrepReduction = ripgrepResult.differential_performance.filter_reduction_percent;
+        }
+
+        // Stage 3: ripgrep_first order (apply jq after ripgrep)
+        if (filterOrder === 'ripgrep_first' && actualJqExpression) {
+            const jqStart = Date.now();
+            const jqResult = await this.jqEngine.query(
+                currentData,
+                actualJqExpression,
+                jqOptions
+            );
+            jqTime = jqResult.performance.execution_time_ms;
+            jqReduction = jqResult.performance.reduction_percent;
+            jqExpression = jqResult.expression_used;
+            currentData = jqResult.data;
+        }
+
+        const totalTime = Date.now() - totalStartTime;
+
+        // Calculate combined performance metrics
+        const differentialReduction = ripgrepResult?.differential_performance.size_reduction_percent || 0;
+        const totalReduction = this.calculateTotalReduction(differentialReduction, jqReduction, ripgrepReduction);
+
+        // Build comprehensive result
+        const baseResult = ripgrepResult || await this.filterDifferentialChanges(changes, filterParams, originalSnapshot);
+
+        return {
+            ...baseResult,
+            filtered_data: currentData,
+            jq_expression_used: jqExpression,
+            jq_performance: jqExpression ? {
+                execution_time_ms: jqTime,
+                input_size_bytes: JSON.stringify(changes).length,
+                output_size_bytes: JSON.stringify(currentData).length,
+                reduction_percent: jqReduction
+            } : undefined,
+            combined_performance: {
+                differential_reduction_percent: differentialReduction,
+                jq_reduction_percent: jqReduction,
+                ripgrep_reduction_percent: ripgrepReduction,
+                total_reduction_percent: totalReduction,
+                differential_time_ms: 0, // Differential time is included in the base processing
+                jq_time_ms: jqTime,
+                ripgrep_time_ms: ripgrepTime,
+                total_time_ms: totalTime
+            }
+        };
+    }
+
+    /**
+     * Calculate combined reduction percentage from multiple filtering stages
+     */
+    private calculateTotalReduction(
+        differentialReduction: number,
+        jqReduction: number,
+        ripgrepReduction: number
+    ): number {
+        // Each stage reduces from the previous stage's output
+        // Formula: 1 - ((1 - r1) * (1 - r2) * (1 - r3))
+        const remaining1 = 1 - (differentialReduction / 100);
+        const remaining2 = 1 - (jqReduction / 100);
+        const remaining3 = 1 - (ripgrepReduction / 100);
+        const totalRemaining = remaining1 * remaining2 * remaining3;
+        return (1 - totalRemaining) * 100;
+    }
+
     /**
      * Filter differential snapshot changes using ripgrep patterns.
      * This is the key integration with our revolutionary differential system.
