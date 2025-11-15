@@ -501,6 +501,10 @@ export class Context {
     permissions?: string[];
     offline?: boolean;
 
+    // Proxy Configuration
+    proxyServer?: string;
+    proxyBypass?: string;
+
     // Browser UI Customization
     chromiumSandbox?: boolean;
     slowMo?: number;
@@ -563,6 +567,21 @@ export class Context {
 
     if (changes.offline !== undefined)
       (currentConfig.browser as any).offline = changes.offline;
+
+    // Apply proxy configuration
+    if (changes.proxyServer !== undefined) {
+      if (changes.proxyServer === '' || changes.proxyServer === null) {
+        // Clear proxy when empty string or null
+        delete currentConfig.browser.launchOptions.proxy;
+      } else {
+        // Set proxy server
+        currentConfig.browser.launchOptions.proxy = {
+          server: changes.proxyServer
+        };
+        if (changes.proxyBypass)
+          currentConfig.browser.launchOptions.proxy.bypass = changes.proxyBypass;
+      }
+    }
 
     // Apply browser launch options for UI customization
     if (changes.chromiumSandbox !== undefined)

@@ -592,6 +592,8 @@ mcpInspector.start('click element', callback) for user collaboration.
     - `colorScheme` (string, optional): Preferred color scheme
     - `permissions` (array, optional): Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])
     - `offline` (boolean, optional): Whether to emulate offline network conditions (equivalent to DevTools offline mode)
+    - `proxyServer` (string, optional): Proxy server to use for network requests. Examples: "http://myproxy:3128", "socks5://127.0.0.1:1080". Set to null (empty) to clear proxy.
+    - `proxyBypass` (string, optional): Comma-separated domains to bypass proxy (e.g., ".com,chromium.org,.domain.com")
     - `chromiumSandbox` (boolean, optional): Enable/disable Chromium sandbox (affects browser appearance)
     - `slowMo` (number, optional): Slow down operations by specified milliseconds (helps with visual tracking)
     - `devtools` (boolean, optional): Open browser with DevTools panel open (Chromium only)
@@ -628,6 +630,38 @@ mcpInspector.start('click element', callback) for user collaboration.
     - `contextLines` (number, optional): Number of context lines around matches
     - `invertMatch` (boolean, optional): Invert match to show non-matches (default: false)
     - `maxMatches` (number, optional): Maximum number of matches to return
+    - `jqExpression` (string, optional): jq expression for structural JSON querying and transformation.
+
+Common patterns:
+• Buttons: .elements[] | select(.role == "button")
+• Errors: .console[] | select(.level == "error")
+• Forms: .elements[] | select(.role == "textbox" or .role == "combobox")
+• Links: .elements[] | select(.role == "link")
+• Transform: [.elements[] | {role, text, id}]
+
+Tip: Use filterPreset instead for common cases - no jq knowledge required!
+    - `filterPreset` (string, optional): Filter preset for common scenarios (no jq knowledge needed).
+
+• buttons_only: Show only buttons
+• links_only: Show only links
+• forms_only: Show form inputs (textbox, combobox, checkbox, etc.)
+• errors_only: Show console errors
+• warnings_only: Show console warnings
+• interactive_only: Show all clickable elements (buttons + links)
+• validation_errors: Show validation alerts
+• navigation_items: Show navigation menus
+• headings_only: Show headings (h1-h6)
+• images_only: Show images
+• changed_text_only: Show elements with text changes
+
+Note: filterPreset and jqExpression are mutually exclusive. Preset takes precedence.
+    - `jqRawOutput` (boolean, optional): Output raw strings instead of JSON (jq -r flag). Useful for extracting plain text values.
+    - `jqCompact` (boolean, optional): Compact JSON output without whitespace (jq -c flag). Reduces output size.
+    - `jqSortKeys` (boolean, optional): Sort object keys in output (jq -S flag). Ensures consistent ordering.
+    - `jqSlurp` (boolean, optional): Read entire input into array and process once (jq -s flag). Enables cross-element operations.
+    - `jqExitStatus` (boolean, optional): Set exit code based on output (jq -e flag). Useful for validation.
+    - `jqNullInput` (boolean, optional): Use null as input instead of reading data (jq -n flag). For generating new structures.
+    - `filterOrder` (string, optional): Order of filter application. "jq_first" (default): structural filter then pattern match - recommended for maximum precision. "ripgrep_first": pattern match then structural filter - useful when you want to narrow down first. "jq_only": pure jq transformation without ripgrep. "ripgrep_only": pure pattern matching without jq (existing behavior).
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->

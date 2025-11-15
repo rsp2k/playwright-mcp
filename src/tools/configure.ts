@@ -40,6 +40,10 @@ const configureSchema = z.object({
   permissions: z.array(z.string()).optional().describe('Permissions to grant (e.g., ["geolocation", "notifications", "camera", "microphone"])'),
   offline: z.boolean().optional().describe('Whether to emulate offline network conditions (equivalent to DevTools offline mode)'),
 
+  // Proxy Configuration
+  proxyServer: z.string().optional().describe('Proxy server to use for network requests. Examples: "http://myproxy:3128", "socks5://127.0.0.1:1080". Set to null (empty) to clear proxy.'),
+  proxyBypass: z.string().optional().describe('Comma-separated domains to bypass proxy (e.g., ".com,chromium.org,.domain.com")'),
+
   // Browser UI Customization Options
   chromiumSandbox: z.boolean().optional().describe('Enable/disable Chromium sandbox (affects browser appearance)'),
   slowMo: z.number().min(0).optional().describe('Slow down operations by specified milliseconds (helps with visual tracking)'),
@@ -316,6 +320,19 @@ export default [
 
         }
 
+        // Track proxy changes
+        if (params.proxyServer !== undefined) {
+          const currentProxy = currentConfig.browser.launchOptions.proxy?.server;
+          if (params.proxyServer !== currentProxy) {
+            const fromProxy = currentProxy || 'none';
+            const toProxy = params.proxyServer || 'none';
+            changes.push(`proxy: ${fromProxy} → ${toProxy}`);
+            if (params.proxyBypass)
+              changes.push(`proxy bypass: ${params.proxyBypass}`);
+
+          }
+        }
+
 
         if (changes.length === 0) {
           response.addResult('No configuration changes detected. Current settings remain the same.');
@@ -334,6 +351,8 @@ export default [
           colorScheme: params.colorScheme,
           permissions: params.permissions,
           offline: params.offline,
+          proxyServer: params.proxyServer,
+          proxyBypass: params.proxyBypass,
         });
 
         response.addResult(`Browser configuration updated successfully:\n${changes.map(c => `• ${c}`).join('\n')}\n\nThe browser has been restarted with the new settings.`);
