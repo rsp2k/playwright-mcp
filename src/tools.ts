@@ -31,6 +31,7 @@ import requests from './tools/requests.js';
 import snapshot from './tools/snapshot.js';
 import tabs from './tools/tabs.js';
 import screenshot from './tools/screenshot.js';
+import themeManagement from './tools/themeManagement.js';
 import video from './tools/video.js';
 import wait from './tools/wait.js';
 import mouse from './tools/mouse.js';
@@ -57,6 +58,7 @@ export const allTools: Tool<any>[] = [
   ...screenshot,
   ...snapshot,
   ...tabs,
+  ...themeManagement,
   ...video,
   ...wait,
 ];
