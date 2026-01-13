@@ -235,10 +235,158 @@ const clearNotifications = defineTool({
   },
 });
 
+// All commonly-used permissions that can be granted
+const ALL_PERMISSIONS = [
+  'geolocation',
+  'notifications',
+  'camera',
+  'microphone',
+  'clipboard-read',
+  'clipboard-write',
+  'accelerometer',
+  'gyroscope',
+  'magnetometer',
+  'midi',
+  'background-sync',
+  'ambient-light-sensor',
+  'accessibility-events',
+];
+
+/**
+ * Grant permissions at runtime without restarting the browser.
+ * More flexible than browser_configure which requires a restart.
+ */
+const grantPermissions = defineTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_grant_permissions',
+    title: 'Grant browser permissions at runtime',
+    description: `Grant browser permissions at runtime without restarting the browser. This is faster than using browser_configure which requires a browser restart.
+
+**Quick option:** Use \`all: true\` to grant all common permissions at once!
+
+**Available permissions:**
+- geolocation - Access user location
+- notifications - Show browser notifications
+- camera - Access camera/webcam
+- microphone - Access microphone
+- clipboard-read - Read from clipboard
+- clipboard-write - Write to clipboard
+- accelerometer - Access motion sensors
+- gyroscope - Access orientation sensors
+- magnetometer - Access compass
+- accessibility-events - Accessibility automation
+- midi - MIDI device access
+- midi-sysex - MIDI system exclusive messages
+- background-sync - Background sync API
+- ambient-light-sensor - Light sensor access
+- payment-handler - Payment request API
+- storage-access - Storage access API
+
+**Note:** Some permissions may require user interaction (like camera/microphone device selection) even after being granted.`,
+    inputSchema: z.object({
+      permissions: z.array(z.string()).optional().describe('List of permissions to grant (e.g., ["geolocation", "camera", "microphone"])'),
+      all: z.boolean().optional().describe('Grant ALL common permissions at once (geolocation, notifications, camera, microphone, clipboard, sensors, midi)'),
+      origin: z.string().optional().describe('Origin to grant permissions for (e.g., "https://example.com"). If not specified, grants for all origins.'),
+    }),
+    type: 'destructive',
+  },
+
+  handle: async (context, params, response) => {
+    const browserContext = await context.existingBrowserContext();
+    if (!browserContext)
+      throw new Error('No browser context available. Navigate to a page first.');
+
+    // Determine which permissions to grant
+    let permissionsToGrant: string[];
+    if (params.all) {
+      permissionsToGrant = ALL_PERMISSIONS;
+    } else if (params.permissions && params.permissions.length > 0) {
+      permissionsToGrant = params.permissions;
+    } else {
+      throw new Error('Either specify "permissions" array or set "all: true" to grant all permissions.');
+    }
+
+    const grantOptions = params.origin ? { origin: params.origin } : undefined;
+
+    await browserContext.grantPermissions(permissionsToGrant, grantOptions);
+
+    const scope = params.origin ? `for ${params.origin}` : 'for all origins';
+    const header = params.all ? '✅ Granted ALL permissions' : '✅ Granted permissions';
+    response.addResult(`${header} ${scope}:\n${permissionsToGrant.map(p => `  • ${p}`).join('\n')}`);
+  },
+});
+
+/**
+ * Clear all granted permissions.
+ */
+const clearPermissions = defineTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_clear_permissions',
+    title: 'Clear all browser permissions',
+    description: 'Revoke all previously granted permissions for the current browser context. Sites will need to request permissions again.',
+    inputSchema: z.object({}),
+    type: 'destructive',
+  },
+
+  handle: async (context, _params, response) => {
+    const browserContext = await context.existingBrowserContext();
+    if (!browserContext)
+      throw new Error('No browser context available. Navigate to a page first.');
+
+    await browserContext.clearPermissions();
+
+    response.addResult('✅ All permissions have been cleared. Sites will need to request permissions again.');
+  },
+});
+
+/**
+ * Set geolocation at runtime.
+ */
+const setGeolocation = defineTool({
+  capability: 'core',
+
+  schema: {
+    name: 'browser_set_geolocation',
+    title: 'Set geolocation at runtime',
+    description: 'Set the browser\'s geolocation at runtime without restarting. Automatically grants geolocation permission.',
+    inputSchema: z.object({
+      latitude: z.number().min(-90).max(90).describe('Latitude coordinate (-90 to 90)'),
+      longitude: z.number().min(-180).max(180).describe('Longitude coordinate (-180 to 180)'),
+      accuracy: z.number().optional().describe('Accuracy in meters (default: 100)'),
+    }),
+    type: 'destructive',
+  },
+
+  handle: async (context, params, response) => {
+    const browserContext = await context.existingBrowserContext();
+    if (!browserContext)
+      throw new Error('No browser context available. Navigate to a page first.');
+
+    // Grant geolocation permission first
+    await browserContext.grantPermissions(['geolocation']);
+
+    // Set the geolocation
+    await browserContext.setGeolocation({
+      latitude: params.latitude,
+      longitude: params.longitude,
+      accuracy: params.accuracy || 100,
+    });
+
+    response.addResult(`✅ Geolocation set to:\n  • Latitude: ${params.latitude}\n  • Longitude: ${params.longitude}\n  • Accuracy: ${params.accuracy || 100}m\n\nGeolocation permission has been automatically granted.`);
+  },
+});
+
 export default [
   configureNotifications,
   listNotifications,
   handleNotification,
   waitForNotification,
   clearNotifications,
+  grantPermissions,
+  clearPermissions,
+  setGeolocation,
 ];

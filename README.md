@@ -181,6 +181,9 @@ Playwright MCP server supports following arguments. They can be provided in the 
   --no-isolated                   use a persistent browser profile. Enables
                                   features like Push API that require
                                   non-incognito mode.
+  --grant-all-permissions         grant all browser permissions (geolocation,
+                                  camera, microphone, clipboard, etc.) at
+                                  startup.
   --image-responses <mode>        whether to send image responses to the client.
                                   Can be "allow" or "omit", Defaults to "allow".
   --no-snapshots                  disable automatic page snapshots after
@@ -556,6 +559,14 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_clear_permissions**
+  - Title: Clear all browser permissions
+  - Description: Revoke all previously granted permissions for the current browser context. Sites will need to request permissions again.
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_clear_requests**
   - Title: Clear captured requests
   - Description: Clear all captured HTTP request data from memory. Useful for freeing up memory during long sessions or when starting fresh analysis.
@@ -835,6 +846,39 @@ This is the FIRST conversational browser automation MCP server!
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_grant_permissions**
+  - Title: Grant browser permissions at runtime
+  - Description: Grant browser permissions at runtime without restarting the browser. This is faster than using browser_configure which requires a browser restart.
+
+**Quick option:** Use `all: true` to grant all common permissions at once!
+
+**Available permissions:**
+- geolocation - Access user location
+- notifications - Show browser notifications
+- camera - Access camera/webcam
+- microphone - Access microphone
+- clipboard-read - Read from clipboard
+- clipboard-write - Write to clipboard
+- accelerometer - Access motion sensors
+- gyroscope - Access orientation sensors
+- magnetometer - Access compass
+- accessibility-events - Accessibility automation
+- midi - MIDI device access
+- midi-sysex - MIDI system exclusive messages
+- background-sync - Background sync API
+- ambient-light-sensor - Light sensor access
+- payment-handler - Payment request API
+- storage-access - Storage access API
+
+**Note:** Some permissions may require user interaction (like camera/microphone device selection) even after being granted.
+  - Parameters:
+    - `permissions` (array, optional): List of permissions to grant (e.g., ["geolocation", "camera", "microphone"])
+    - `all` (boolean, optional): Grant ALL common permissions at once (geolocation, notifications, camera, microphone, clipboard, sensors, midi)
+    - `origin` (string, optional): Origin to grant permissions for (e.g., "https://example.com"). If not specified, grants for all origins.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_handle_dialog**
   - Title: Handle a dialog
   - Description: Handle a dialog. Returns page snapshot after handling dialog (configurable via browser_configure_snapshots).
@@ -1097,6 +1141,17 @@ Full API: See MODEL-COLLABORATION-API.md
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
     - `values` (array): Array of values to select in the dropdown. This can be a single value or multiple values.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_set_geolocation**
+  - Title: Set geolocation at runtime
+  - Description: Set the browser's geolocation at runtime without restarting. Automatically grants geolocation permission.
+  - Parameters:
+    - `latitude` (number): Latitude coordinate (-90 to 90)
+    - `longitude` (number): Longitude coordinate (-180 to 180)
+    - `accuracy` (number, optional): Accuracy in meters (default: 100)
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->

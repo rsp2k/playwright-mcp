@@ -34,6 +34,7 @@ export type CLIOptions = {
   consoleOutputFile?: string;
   device?: string;
   executablePath?: string;
+  grantAllPermissions?: boolean;
   headless?: boolean;
   host?: string;
   ignoreHttpsErrors?: boolean;
@@ -191,6 +192,25 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
   if (cliOptions.blockServiceWorkers)
     contextOptions.serviceWorkers = 'block';
 
+  // Grant all permissions if requested
+  if (cliOptions.grantAllPermissions) {
+    contextOptions.permissions = [
+      'geolocation',
+      'notifications',
+      'camera',
+      'microphone',
+      'clipboard-read',
+      'clipboard-write',
+      'accelerometer',
+      'gyroscope',
+      'magnetometer',
+      'midi',
+      'background-sync',
+      'ambient-light-sensor',
+      'accessibility-events',
+    ];
+  }
+
   const result: Config = {
     browser: {
       browserName,
@@ -236,6 +256,7 @@ function configFromEnv(): Config {
   options.config = envToString(process.env.PLAYWRIGHT_MCP_CONFIG);
   options.device = envToString(process.env.PLAYWRIGHT_MCP_DEVICE);
   options.executablePath = envToString(process.env.PLAYWRIGHT_MCP_EXECUTABLE_PATH);
+  options.grantAllPermissions = envToBoolean(process.env.PLAYWRIGHT_MCP_GRANT_ALL_PERMISSIONS);
   options.headless = envToBoolean(process.env.PLAYWRIGHT_MCP_HEADLESS);
   options.host = envToString(process.env.PLAYWRIGHT_MCP_HOST);
   options.ignoreHttpsErrors = envToBoolean(process.env.PLAYWRIGHT_MCP_IGNORE_HTTPS_ERRORS);

@@ -46,6 +46,7 @@ program
     .option('--ignore-https-errors', 'ignore https errors')
     .option('--isolated', 'keep the browser profile in memory, do not save it to disk. This is the default.')
     .option('--no-isolated', 'use a persistent browser profile. Enables features like Push API that require non-incognito mode.')
+    .option('--grant-all-permissions', 'grant all browser permissions (geolocation, camera, microphone, clipboard, etc.) at startup.')
     .option('--image-responses <mode>', 'whether to send image responses to the client. Can be "allow" or "omit", Defaults to "allow".')
     .option('--no-snapshots', 'disable automatic page snapshots after interactive operations like clicks. Use browser_snapshot tool for explicit snapshots.')
     .option('--max-snapshot-tokens <tokens>', 'maximum number of tokens allowed in page snapshots before truncation. Use 0 to disable truncation. Default is 10000.', parseInt)
