@@ -34,7 +34,28 @@ export type DialogModalState = {
   dialog: playwright.Dialog;
 };
 
-export type ModalState = FileUploadModalState | DialogModalState;
+export type WebNotification = {
+  id: string;
+  title: string;
+  body: string;
+  icon?: string;
+  tag?: string;
+  origin: string;
+  timestamp: number;
+  requireInteraction?: boolean;
+  actions?: Array<{ action: string; title: string; icon?: string }>;
+  data?: unknown;
+  clicked?: boolean;
+  closed?: boolean;
+};
+
+export type NotificationModalState = {
+  type: 'notification';
+  description: string;
+  notification: WebNotification;
+};
+
+export type ModalState = FileUploadModalState | DialogModalState | NotificationModalState;
 
 export type Tool<Input extends z.Schema = z.Schema> = {
   capability: ToolCapability;

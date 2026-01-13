@@ -24,7 +24,7 @@ import { EnvironmentIntrospector } from './environmentIntrospection.js';
 import { RequestInterceptor, RequestInterceptorOptions } from './requestInterceptor.js';
 import { ArtifactManagerRegistry } from './artifactManager.js';
 
-import type { Tool } from './tools/tool.js';
+import type { Tool, WebNotification } from './tools/tool.js';
 import type { FullConfig } from './config.js';
 import type { BrowserContextFactory } from './browserContextFactory.js';
 import type { InjectionConfig } from './tools/codeInjection.js';
@@ -94,6 +94,9 @@ export class Context {
   // Code injection for debug toolbar and custom scripts
   injectionConfig: InjectionConfig | undefined;
 
+  // Browser notifications storage
+  private _notifications: WebNotification[] = [];
+
   constructor(tools: Tool[], config: FullConfig, browserContextFactory: BrowserContextFactory, environmentIntrospector?: EnvironmentIntrospector) {
     this.tools = tools;
     this.config = config;
@@ -155,6 +158,23 @@ export class Context {
     if (!this._currentTab)
       throw new Error('No open pages available. Use the "browser_navigate" tool to navigate to a page first.');
     return this._currentTab;
+  }
+
+  // Notification management methods
+  addNotification(notification: WebNotification): void {
+    this._notifications.push(notification);
+  }
+
+  notifications(): WebNotification[] {
+    return this._notifications;
+  }
+
+  getNotification(id: string): WebNotification | undefined {
+    return this._notifications.find(n => n.id === id);
+  }
+
+  clearNotifications(): void {
+    this._notifications.length = 0;
   }
 
   async newTab(): Promise<Tab> {
@@ -356,6 +376,17 @@ export class Context {
       });
     }
     return this._browserContextPromise;
+  }
+
+  /**
+   * Returns the existing browser context if one has been created, or undefined.
+   * Does not create a new context - use for operations that need an existing context.
+   */
+  async existingBrowserContext(): Promise<playwright.BrowserContext | undefined> {
+    if (!this._browserContextPromise)
+      return undefined;
+    const { browserContext } = await this._browserContextPromise;
+    return browserContext;
   }
 
   private async _setupBrowserContext(): Promise<{ browserContext: playwright.BrowserContext, close: () => Promise<void> }> {

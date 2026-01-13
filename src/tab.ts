@@ -21,7 +21,7 @@ import * as playwright from 'playwright';
 import { callOnPageNoTrace, waitForCompletion } from './tools/utils.js';
 import { logUnhandledError } from './log.js';
 import { ManualPromise } from './manualPromise.js';
-import { ModalState } from './tools/tool.js';
+import { ModalState, WebNotification } from './tools/tool.js';
 import { outputFile } from './config.js';
 
 import type { Context } from './context.js';
@@ -47,6 +47,8 @@ export class Tab extends EventEmitter<TabEventsInterface> {
   private _onPageClose: (tab: Tab) => void;
   private _modalStates: ModalState[] = [];
   private _downloads: { download: playwright.Download, finished: boolean, outputFile: string }[] = [];
+  private _notifications: WebNotification[] = [];
+  private _notificationIdCounter = 0;
 
   constructor(context: Context, page: playwright.Page, onPageClose: (tab: Tab) => void) {
     super();
@@ -77,6 +79,9 @@ export class Tab extends EventEmitter<TabEventsInterface> {
 
     // Initialize extension-based console capture
     void this._initializeExtensionConsoleCapture();
+
+    // Initialize notification capture
+    void this._initializeNotificationCapture();
   }
 
   modalStates(): ModalState[] {
@@ -373,6 +378,140 @@ export class Tab extends EventEmitter<TabEventsInterface> {
     } catch (error) {
       logUnhandledError(error);
     }
+  }
+
+  private async _initializeNotificationCapture() {
+    try {
+      // Expose a function that the injected script can call to report notifications
+      await this.page.exposeFunction('__playwright_notificationShown', (data: {
+        title: string;
+        body?: string;
+        icon?: string;
+        tag?: string;
+        requireInteraction?: boolean;
+        actions?: Array<{ action: string; title: string; icon?: string }>;
+        data?: unknown;
+      }) => {
+        this._handleNotificationShown(data);
+      });
+
+      // Inject the Notification interceptor script
+      await this.page.addInitScript(() => {
+        // Store original Notification constructor
+        const OriginalNotification = window.Notification as any;
+
+        // Create intercepting Notification class
+        class InterceptedNotification extends OriginalNotification {
+          constructor(title: string, options?: NotificationOptions) {
+            super(title, options);
+
+            // Report notification to Playwright
+            try {
+              const opts = options as any;
+              (window as any).__playwright_notificationShown({
+                title,
+                body: opts?.body,
+                icon: opts?.icon,
+                tag: opts?.tag,
+                requireInteraction: opts?.requireInteraction,
+                actions: opts?.actions,
+                data: opts?.data,
+              });
+            } catch (e) {
+              // Ignore errors from reporting
+            }
+          }
+        }
+
+        // Copy static properties
+        Object.defineProperty(InterceptedNotification, 'permission', {
+          get: () => OriginalNotification.permission,
+        });
+        (InterceptedNotification as any).requestPermission = OriginalNotification.requestPermission.bind(OriginalNotification);
+        if (OriginalNotification.maxActions !== undefined)
+          (InterceptedNotification as any).maxActions = OriginalNotification.maxActions;
+
+        // Replace global Notification
+        (window as any).Notification = InterceptedNotification;
+      });
+
+    } catch (error) {
+      // Silently handle errors - page may not support exposeFunction
+      logUnhandledError(error);
+    }
+  }
+
+  private _handleNotificationShown(data: {
+    title: string;
+    body?: string;
+    icon?: string;
+    tag?: string;
+    requireInteraction?: boolean;
+    actions?: Array<{ action: string; title: string; icon?: string }>;
+    data?: unknown;
+  }) {
+    const notification: WebNotification = {
+      id: `notif-${++this._notificationIdCounter}-${Date.now()}`,
+      title: data.title,
+      body: data.body || '',
+      icon: data.icon,
+      tag: data.tag,
+      origin: this.page.url(),
+      timestamp: Date.now(),
+      requireInteraction: data.requireInteraction,
+      actions: data.actions,
+      data: data.data,
+      clicked: false,
+      closed: false,
+    };
+
+    this._notifications.push(notification);
+
+    // Set modal state so tools know there's a notification to handle
+    this.setModalState({
+      type: 'notification',
+      description: `Notification "${notification.title}" from ${new URL(notification.origin).hostname}`,
+      notification,
+    });
+
+    // Also notify context for aggregation
+    this.context.addNotification(notification);
+  }
+
+  notifications(): WebNotification[] {
+    return this._notifications;
+  }
+
+  getNotification(id: string): WebNotification | undefined {
+    return this._notifications.find(n => n.id === id);
+  }
+
+  markNotificationClicked(id: string) {
+    const notification = this._notifications.find(n => n.id === id);
+    if (notification) {
+      notification.clicked = true;
+      // Clear modal state for this notification
+      const modalState = this._modalStates.find(s => s.type === 'notification' && s.notification.id === id);
+      if (modalState)
+        this.clearModalState(modalState);
+    }
+  }
+
+  markNotificationClosed(id: string) {
+    const notification = this._notifications.find(n => n.id === id);
+    if (notification) {
+      notification.closed = true;
+      // Clear modal state for this notification
+      const modalState = this._modalStates.find(s => s.type === 'notification' && s.notification.id === id);
+      if (modalState)
+        this.clearModalState(modalState);
+    }
+  }
+
+  clearNotifications() {
+    // Clear notification modal states
+    this._modalStates = this._modalStates.filter(s => s.type !== 'notification');
+    this._notifications.length = 0;
   }
 
   private _onClose() {

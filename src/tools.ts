@@ -26,6 +26,7 @@ import install from './tools/install.js';
 import keyboard from './tools/keyboard.js';
 import navigate from './tools/navigate.js';
 import network from './tools/network.js';
+import notifications from './tools/notifications.js';
 import pdf from './tools/pdf.js';
 import requests from './tools/requests.js';
 import snapshot from './tools/snapshot.js';
@@ -52,6 +53,7 @@ export const allTools: Tool<any>[] = [
   ...keyboard,
   ...navigate,
   ...network,
+  ...notifications,
   ...mouse,
   ...pdf,
   ...requests,
