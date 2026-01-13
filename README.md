@@ -189,8 +189,6 @@ Playwright MCP server supports following arguments. They can be provided in the 
   --differential-snapshots        enable differential snapshots that only show
                                   changes since the last snapshot instead of
                                   full page snapshots.
-  --no-differential-snapshots     disable differential snapshots and always
-                                  return full page snapshots.
   --no-sandbox                    disable the sandbox for all process types that
                                   are normally sandboxed.
   --output-dir <path>             path to the directory for output files.
@@ -547,6 +545,14 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_clear_notifications**
+  - Title: Clear notification history
+  - Description: Clear all captured notifications from the session history.
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_clear_requests**
   - Title: Clear captured requests
   - Description: Clear all captured HTTP request data from memory. Useful for freeing up memory during long sessions or when starting fresh analysis.
@@ -558,9 +564,6 @@ http.createServer(async (req, res) => {
 - **browser_click**
   - Title: Click
   - Description: Perform click on a web page. Returns page snapshot after click (configurable via browser_configure_snapshots). Use browser_snapshot for explicit full snapshots.
-
-🤖 MODELS: Use mcpNotify.info('message'), mcpPrompt('question?'), and 
-mcpInspector.start('click element', callback) for user collaboration.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -609,6 +612,15 @@ mcpInspector.start('click element', callback) for user collaboration.
     - `enabled` (boolean, optional): Enable or disable centralized artifact storage for this session
     - `directory` (string, optional): Directory path for artifact storage (if different from server default)
     - `sessionId` (string, optional): Custom session ID for artifact organization (auto-generated if not provided)
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_configure_notifications**
+  - Title: Configure notification permissions
+  - Description: Grant or deny notification permissions for specific origins. This controls whether websites can show browser notifications.
+  - Parameters:
+    - `origins` (array): List of origins and their notification permissions
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -765,16 +777,6 @@ This is the FIRST conversational browser automation MCP server!
 - **browser_evaluate**
   - Title: Evaluate JavaScript
   - Description: Evaluate JavaScript expression on page or element. Returns page snapshot after evaluation (configurable via browser_configure_snapshots).
-
-🤖 COLLABORATION API AVAILABLE:
-After running this tool, models can use JavaScript to communicate with users:
-- mcpNotify.info('message'), mcpNotify.success(), mcpNotify.warning(), mcpNotify.error() for messages
-- await mcpPrompt('Should I proceed?') for user confirmations  
-- mcpInspector.start('click element', callback) for interactive element selection
-
-Example: await page.evaluate(() => mcpNotify.success('Task completed!'));
-
-Full API: See MODEL-COLLABORATION-API.md
   - Parameters:
     - `function` (string): () => { /* code */ } or (element) => { /* code */ } when element is provided
     - `element` (string, optional): Human-readable element description used to obtain permission to interact with the element
@@ -836,6 +838,17 @@ Full API: See MODEL-COLLABORATION-API.md
   - Parameters:
     - `accept` (boolean): Whether to accept the dialog.
     - `promptText` (string, optional): The text of the prompt in case of a prompt dialog.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_handle_notification**
+  - Title: Handle a browser notification
+  - Description: Click or close a browser notification. Use browser_list_notifications to see available notifications and their IDs.
+  - Parameters:
+    - `notificationId` (string): The notification ID to handle (from browser_list_notifications)
+    - `action` (string): Action to take: "click" simulates clicking the notification, "close" dismisses it
+    - `actionButton` (string, optional): For notifications with action buttons, specify which action to click
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -921,6 +934,16 @@ Full API: See MODEL-COLLABORATION-API.md
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_list_notifications**
+  - Title: List browser notifications
+  - Description: List all notifications that have been shown during this browser session. Returns notification details including title, body, origin, and status.
+  - Parameters:
+    - `origin` (string, optional): Filter notifications by origin URL
+    - `includeHandled` (boolean, optional): Include notifications that have been clicked or closed (default: true)
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_mcp_theme_create**
   - Title: Create custom MCP theme
   - Description: Create a new custom theme for MCP client identification
@@ -974,9 +997,6 @@ Full API: See MODEL-COLLABORATION-API.md
 - **browser_navigate**
   - Title: Navigate to a URL
   - Description: Navigate to a URL. Returns page snapshot after navigation (configurable via browser_configure_snapshots).
-
-🤖 MODELS: Use mcpNotify.info('message'), mcpPrompt('question?'), and 
-mcpInspector.start('click element', callback) for user collaboration.
   - Parameters:
     - `url` (string): The URL to navigate to
   - Read-only: **false**
@@ -1184,6 +1204,18 @@ mcpInspector.start('click element', callback) for user collaboration.
     - `text` (string, optional): The text to wait for
     - `textGone` (string, optional): The text to wait for to disappear
     - `recordDuringWait` (boolean, optional): Whether to keep video recording active during the wait (default: false in smart mode, true in continuous mode)
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_wait_notification**
+  - Title: Wait for a notification
+  - Description: Wait for a browser notification to appear, optionally matching specific criteria. Returns when a matching notification is shown or timeout is reached.
+  - Parameters:
+    - `title` (string, optional): Wait for notification with this exact title
+    - `titleContains` (string, optional): Wait for notification with title containing this text
+    - `origin` (string, optional): Wait for notification from this origin
+    - `timeout` (number, optional): Maximum time to wait in milliseconds (default: 30000)
   - Read-only: **true**
 
 </details>
