@@ -28,6 +28,7 @@ import navigate from './tools/navigate.js';
 import network from './tools/network.js';
 import notifications from './tools/notifications.js';
 import pdf from './tools/pdf.js';
+import sensors from './tools/sensors.js';
 import requests from './tools/requests.js';
 import snapshot from './tools/snapshot.js';
 import tabs from './tools/tabs.js';
@@ -58,6 +59,7 @@ export const allTools: Tool<any>[] = [
   ...pdf,
   ...requests,
   ...screenshot,
+  ...sensors,
   ...snapshot,
   ...tabs,
   ...themeManagement,

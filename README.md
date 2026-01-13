@@ -606,6 +606,22 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_clear_device_motion**
+  - Title: Clear device motion override
+  - Description: Remove the device motion override and stop sending simulated motion events.
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_clear_device_orientation**
+  - Title: Clear device orientation override
+  - Description: Remove the device orientation override and return to default sensor behavior.
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_clear_injections**
   - Title: Clear Injections
   - Description: Remove all custom code injections (keeps debug toolbar)
@@ -1205,6 +1221,62 @@ Full API: See MODEL-COLLABORATION-API.md
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
     - `values` (array): Array of values to select in the dropdown. This can be a single value or multiple values.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_set_device_motion**
+  - Title: Set device motion sensors
+  - Description: Override accelerometer and gyroscope sensor values. Affects the DeviceMotionEvent API.
+
+**Acceleration** (m/s²): Linear acceleration excluding gravity
+- x: left(-) to right(+)
+- y: down(-) to up(+)
+- z: backward(-) to forward(+)
+
+**Acceleration Including Gravity** (m/s²): Total acceleration including gravity
+- At rest: { x: 0, y: -9.8, z: 0 } (Earth's gravity pulling down)
+
+**Rotation Rate** (deg/s): Angular velocity around each axis
+- alpha: rotation around z-axis
+- beta: rotation around x-axis
+- gamma: rotation around y-axis
+
+**Common scenarios:**
+- Device at rest: acceleration={x:0,y:0,z:0}, accelerationIncludingGravity={x:0,y:-9.8,z:0}
+- Shaking horizontally: acceleration={x:5,y:0,z:0}
+- Free fall: accelerationIncludingGravity={x:0,y:0,z:0}
+
+**Note:** Requires Chromium-based browser.
+  - Parameters:
+    - `acceleration` (object, optional): Linear acceleration excluding gravity
+    - `accelerationIncludingGravity` (object, optional): Total acceleration including gravity
+    - `rotationRate` (object, optional): Angular velocity around each axis
+    - `interval` (number, optional): Interval between samples in milliseconds (default: 16)
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_set_device_orientation**
+  - Title: Set device orientation
+  - Description: Override device orientation sensor values. Affects the DeviceOrientationEvent API.
+
+**Parameters:**
+- **alpha** (0-360): Rotation around the z-axis (compass heading). 0 = North, 90 = East
+- **beta** (-180 to 180): Front-to-back tilt. Positive = tilted backward
+- **gamma** (-90 to 90): Left-to-right tilt. Positive = tilted right
+
+**Common orientations:**
+- Flat on table: alpha=any, beta=0, gamma=0
+- Portrait upright: alpha=any, beta=90, gamma=0
+- Landscape left: alpha=any, beta=0, gamma=90
+- Tilted 45° forward: alpha=any, beta=-45, gamma=0
+
+**Note:** Requires Chromium-based browser. This overrides the DeviceOrientationEvent.
+  - Parameters:
+    - `alpha` (number): Compass heading (0-360 degrees). 0=North, 90=East, 180=South, 270=West
+    - `beta` (number): Front-to-back tilt (-180 to 180 degrees). Positive=tilted backward
+    - `gamma` (number): Left-to-right tilt (-90 to 90 degrees). Positive=tilted right
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
