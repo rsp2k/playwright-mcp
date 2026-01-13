@@ -934,6 +934,95 @@ export default [
       }
     },
   }),
+  defineTool({
+    capability: 'core',
+    schema: {
+      name: 'browser_status',
+      title: 'Get browser status and capabilities',
+      description: 'Get current browser configuration status including mode (isolated/persistent), profile path, and available capabilities like Push API support.',
+      inputSchema: z.object({}),
+      type: 'readOnly',
+    },
+    handle: async (context: Context, _params: unknown, response: Response) => {
+      const config = context.config;
+      const browserConfig = config.browser;
+
+      const isIsolated = browserConfig.isolated;
+      const mode = isIsolated ? 'isolated (incognito-like)' : 'persistent';
+
+      // Build status report
+      const lines: string[] = [
+        '## 🌐 Browser Status',
+        '',
+        '### Mode',
+        `**${mode.toUpperCase()}**`,
+        '',
+      ];
+
+      if (isIsolated) {
+        lines.push(
+          '⚠️ **Limitations in isolated mode:**',
+          '- Push API (pushManager.subscribe) is blocked',
+          '- Service workers don\'t persist across sessions',
+          '- Browser state is ephemeral',
+          '',
+          '💡 **To enable Push API:** Restart with `--no-isolated` flag or set `PLAYWRIGHT_MCP_ISOLATED=false`',
+          ''
+        );
+      } else {
+        const profilePath = browserConfig.userDataDir || '~/.cache/ms-playwright/mcp-<browser>-profile (auto)';
+        lines.push(
+          '✅ **Full capabilities available:**',
+          '- Push API (pushManager.subscribe) is supported',
+          '- Service workers persist across sessions',
+          '- Browser state is retained',
+          '',
+          `📁 **Profile path:** \`${profilePath}\``,
+          '',
+          '💡 **Custom path:** Use `--user-data-dir <path>` or `PLAYWRIGHT_MCP_USER_DATA_DIR=<path>`',
+          ''
+        );
+      }
+
+      // Browser info
+      const browserName = browserConfig.browserName;
+      const channel = browserConfig.launchOptions?.channel;
+      lines.push(
+        '### Browser',
+        `- **Type:** ${browserName}${channel ? ` (${channel})` : ''}`,
+        `- **Headless:** ${browserConfig.launchOptions?.headless ? 'yes' : 'no'}`,
+      );
+
+      // Viewport
+      const viewport = browserConfig.contextOptions?.viewport;
+      if (viewport) {
+        lines.push(`- **Viewport:** ${viewport.width}x${viewport.height}`);
+      } else {
+        lines.push('- **Viewport:** maximized (null)');
+      }
+
+      // Proxy
+      const proxy = browserConfig.launchOptions?.proxy;
+      if (proxy) {
+        lines.push(`- **Proxy:** ${proxy.server}`);
+      }
+
+      lines.push('');
+
+      // Capabilities summary
+      lines.push(
+        '### Capabilities',
+        `| Feature | Status |`,
+        `|---------|--------|`,
+        `| Push API | ${isIsolated ? '❌ Blocked' : '✅ Available'} |`,
+        `| Notifications API | ✅ Available |`,
+        `| Service Workers | ${isIsolated ? '⚠️ Ephemeral' : '✅ Persistent'} |`,
+        `| Browser Storage | ${isIsolated ? '⚠️ Ephemeral' : '✅ Persistent'} |`,
+      );
+
+      response.addResult(lines.join('\n'));
+    },
+  }),
   offlineModeTest,
 ];
 

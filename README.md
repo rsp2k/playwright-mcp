@@ -1155,6 +1155,14 @@ Full API: See MODEL-COLLABORATION-API.md
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_status**
+  - Title: Get browser status and capabilities
+  - Description: Get current browser configuration status including mode (isolated/persistent), profile path, and available capabilities like Push API support.
+  - Parameters: None
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_stop_recording**
   - Title: Stop video recording
   - Description: Finalize video recording session and return paths to all recorded video files (.webm format). Automatically closes browser pages to ensure videos are properly saved and available for use. Essential final step for completing video recording workflows and accessing demo files.
