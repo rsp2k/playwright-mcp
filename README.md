@@ -7,6 +7,7 @@ A Model Context Protocol (MCP) server that provides browser automation capabilit
 - **Fast and lightweight**. Uses Playwright's accessibility tree, not pixel-based input.
 - **LLM-friendly**. No vision models needed, operates purely on structured data.
 - **Deterministic tool application**. Avoids ambiguity common with screenshot-based approaches.
+- **🔔 Push Notifications & Permissions**. Full Web Notifications API support with notification capture, plus runtime permission grants for camera, microphone, geolocation, clipboard, and sensors.
 - **🤖 AI-Human Collaboration System**. Direct JavaScript communication between models and users with `mcpNotify`, `mcpPrompt`, and interactive element selection via `mcpInspector`.
 - **🎯 Multi-client identification**. Professional floating debug toolbar with themes to identify which MCP client controls the browser in multi-client environments.
 - **📊 Advanced HTTP monitoring**. Comprehensive request/response interception with headers, bodies, timing analysis, and export to HAR/CSV formats.
@@ -261,6 +262,69 @@ state [here](https://playwright.dev/docs/auth).
   }
 }
 ```
+
+### Browser Permissions & Push Notifications
+
+The server provides comprehensive permission management for browser automation, including runtime permission grants and push notification support.
+
+#### Quick Start: Grant All Permissions
+
+```bash
+# Grant all common permissions at startup
+npx @playwright/mcp@latest --grant-all-permissions
+
+# Or via environment variable
+PLAYWRIGHT_MCP_GRANT_ALL_PERMISSIONS=true npx @playwright/mcp@latest
+```
+
+#### Permission Tools
+
+| Tool | Description |
+|------|-------------|
+| `browser_grant_permissions` | Grant permissions at runtime (supports `all: true` for all permissions) |
+| `browser_clear_permissions` | Revoke all granted permissions |
+| `browser_set_geolocation` | Set geolocation coordinates at runtime |
+| `browser_configure_notifications` | Configure notification permissions per-origin |
+| `browser_list_notifications` | List captured browser notifications |
+| `browser_handle_notification` | Click or close a notification |
+| `browser_wait_notification` | Wait for a notification to appear |
+| `browser_status` | Show current browser mode and capability status |
+
+#### Available Permissions
+
+When using `--grant-all-permissions` or `browser_grant_permissions({ all: true })`:
+
+- `geolocation` - Location access
+- `notifications` - Browser notifications
+- `camera` - Webcam access
+- `microphone` - Audio input
+- `clipboard-read` / `clipboard-write` - Clipboard access
+- `accelerometer` / `gyroscope` / `magnetometer` - Motion sensors
+- `midi` - MIDI device access
+- `background-sync` - Background sync API
+- `ambient-light-sensor` - Light sensor
+- `accessibility-events` - Accessibility automation
+
+#### Push API Support
+
+The Push API requires a persistent browser profile. By default, the server runs in isolated (incognito-like) mode which blocks Push API.
+
+**To enable Push API:**
+
+```bash
+# Use persistent profile mode
+npx @playwright/mcp@latest --no-isolated
+
+# Or combine with all permissions
+npx @playwright/mcp@latest --no-isolated --grant-all-permissions
+```
+
+| Mode | Flag | Push API | State Persistence |
+|------|------|----------|-------------------|
+| Isolated (default) | `--isolated` | ❌ Blocked | ❌ Ephemeral |
+| Persistent | `--no-isolated` | ✅ Works | ✅ Retained |
+
+Use `browser_status` tool to check current mode and capabilities at any time.
 
 ### Configuration file
 
