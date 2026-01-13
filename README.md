@@ -177,7 +177,10 @@ Playwright MCP server supports following arguments. They can be provided in the 
                                   Use 0.0.0.0 to bind to all interfaces.
   --ignore-https-errors           ignore https errors
   --isolated                      keep the browser profile in memory, do not
-                                  save it to disk.
+                                  save it to disk. This is the default.
+  --no-isolated                   use a persistent browser profile. Enables
+                                  features like Push API that require
+                                  non-incognito mode.
   --image-responses <mode>        whether to send image responses to the client.
                                   Can be "allow" or "omit", Defaults to "allow".
   --no-snapshots                  disable automatic page snapshots after
