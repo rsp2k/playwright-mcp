@@ -21,7 +21,7 @@ import * as playwright from 'playwright';
 import { callOnPageNoTrace, waitForCompletion } from './tools/utils.js';
 import { logUnhandledError } from './log.js';
 import { ManualPromise } from './manualPromise.js';
-import { ModalState, WebNotification } from './tools/tool.js';
+import { ModalState, WebNotification, RTCConnectionData, RTCStatsSnapshot } from './tools/tool.js';
 import { outputFile } from './config.js';
 
 import type { Context } from './context.js';
@@ -49,6 +49,10 @@ export class Tab extends EventEmitter<TabEventsInterface> {
   private _downloads: { download: playwright.Download, finished: boolean, outputFile: string }[] = [];
   private _notifications: WebNotification[] = [];
   private _notificationIdCounter = 0;
+  private _rtcConnections: RTCConnectionData[] = [];
+  private _rtcConnectionIdCounter = 0;
+  private _rtcStatsPollingInterval: NodeJS.Timeout | undefined;
+  private _rtcMonitoringEnabled = false;
 
   constructor(context: Context, page: playwright.Page, onPageClose: (tab: Tab) => void) {
     super();
@@ -439,6 +443,317 @@ export class Tab extends EventEmitter<TabEventsInterface> {
       // Silently handle errors - page may not support exposeFunction
       logUnhandledError(error);
     }
+  }
+
+  async _initializeRTCMonitoring() {
+    try {
+      // Expose callback for new RTC connections
+      await this.page.exposeFunction('__playwright_rtcConnectionCreated', (data: { internalId: string }) => {
+        this._handleRTCConnectionCreated(data);
+      });
+
+      // Expose callback for state updates
+      await this.page.exposeFunction('__playwright_rtcConnectionUpdate', (data: {
+        id: string;
+        connectionState: RTCPeerConnectionState;
+        iceConnectionState: RTCIceConnectionState;
+        iceGatheringState: RTCIceGatheringState;
+        signalingState: RTCSignalingState;
+      }) => {
+        this._handleRTCConnectionUpdate(data);
+      });
+
+      // Inject RTCPeerConnection interceptor
+      await this.page.addInitScript(() => {
+        // Store original constructor
+        const OriginalRTCPeerConnection = window.RTCPeerConnection;
+
+        // Map to track connections by internal ID
+        const rtcConnections = new Map<string, RTCPeerConnection>();
+        let connectionCounter = 0;
+
+        // Intercepting RTCPeerConnection class
+        class InterceptedRTCPeerConnection extends OriginalRTCPeerConnection {
+          private _internalId: string;
+
+          constructor(configuration?: RTCConfiguration) {
+            super(configuration);
+
+            // Generate internal ID
+            this._internalId = `browser-rtc-${++connectionCounter}-${Date.now()}`;
+            rtcConnections.set(this._internalId, this);
+
+            // Report connection creation
+            try {
+              (window as any).__playwright_rtcConnectionCreated({
+                internalId: this._internalId,
+              });
+            } catch (e) {
+              // Ignore
+            }
+
+            // Report state changes
+            const reportState = () => {
+              try {
+                (window as any).__playwright_rtcConnectionUpdate({
+                  id: this._internalId,
+                  connectionState: this.connectionState,
+                  iceConnectionState: this.iceConnectionState,
+                  iceGatheringState: this.iceGatheringState,
+                  signalingState: this.signalingState,
+                });
+              } catch (e) {
+                // Ignore
+              }
+            };
+
+            // Listen to all state change events
+            this.addEventListener('connectionstatechange', reportState);
+            this.addEventListener('iceconnectionstatechange', reportState);
+            this.addEventListener('icegatheringstatechange', reportState);
+            this.addEventListener('signalingstatechange', reportState);
+
+            // Report initial state
+            setTimeout(reportState, 0);
+
+            // Clean up on close
+            this.addEventListener('connectionstatechange', () => {
+              if (this.connectionState === 'closed')
+                rtcConnections.delete(this._internalId);
+
+            });
+          }
+        }
+
+        // Copy static properties and methods
+        Object.setPrototypeOf(InterceptedRTCPeerConnection, OriginalRTCPeerConnection);
+        Object.setPrototypeOf(InterceptedRTCPeerConnection.prototype, OriginalRTCPeerConnection.prototype);
+
+        // Replace global RTCPeerConnection
+        (window as any).RTCPeerConnection = InterceptedRTCPeerConnection;
+
+        // Store connections map globally for stats access
+        (window as any).__rtcConnections = rtcConnections;
+      });
+
+      this._rtcMonitoringEnabled = true;
+
+    } catch (error) {
+      logUnhandledError(error);
+    }
+  }
+
+  private _handleRTCConnectionCreated(data: { internalId: string }) {
+    const connection: RTCConnectionData & { _internalId: string } = {
+      id: `rtc-${++this._rtcConnectionIdCounter}-${Date.now()}`,
+      origin: this.page.url(),
+      timestamp: Date.now(),
+      connectionState: 'new',
+      iceConnectionState: 'new',
+      iceGatheringState: 'new',
+      signalingState: 'stable',
+      stateHistory: [],
+      _internalId: data.internalId,
+    };
+
+    this._rtcConnections.push(connection as any);
+    this.context.addRTCConnection(connection);
+  }
+
+  private _handleRTCConnectionUpdate(data: {
+    id: string;
+    connectionState: RTCPeerConnectionState;
+    iceConnectionState: RTCIceConnectionState;
+    iceGatheringState: RTCIceGatheringState;
+    signalingState: RTCSignalingState;
+  }) {
+    const connection = this._rtcConnections.find(c => (c as any)._internalId === data.id);
+    if (!connection) return;
+
+    connection.connectionState = data.connectionState;
+    connection.iceConnectionState = data.iceConnectionState;
+    connection.iceGatheringState = data.iceGatheringState;
+    connection.signalingState = data.signalingState;
+
+    connection.stateHistory.push({
+      timestamp: Date.now(),
+      connectionState: data.connectionState,
+      iceConnectionState: data.iceConnectionState,
+    });
+
+    // Limit history size
+    if (connection.stateHistory.length > 100)
+      connection.stateHistory.shift();
+
+  }
+
+  private async _requestRTCStats(internalId: string): Promise<void> {
+    try {
+      // Execute in page context to get stats
+      const rawStats = await this.page.evaluate(async (id) => {
+        const rtcConnections = (window as any).__rtcConnections;
+        const pc = rtcConnections?.get(id);
+        if (!pc) return null;
+
+        const stats = await pc.getStats();
+        const result: any = {};
+
+        stats.forEach((report: any) => {
+          if (!result[report.type])
+            result[report.type] = [];
+
+          // Convert to plain object
+          const obj: any = { id: report.id, timestamp: report.timestamp, type: report.type };
+          for (const key in report) {
+            if (typeof report[key] !== 'function')
+              obj[key] = report[key];
+
+          }
+          result[report.type].push(obj);
+        });
+
+        return result;
+      }, internalId);
+
+      if (!rawStats) return;
+
+      // Find our connection
+      const connection = this._rtcConnections.find(c => (c as any)._internalId === internalId);
+      if (!connection) return;
+
+      // Parse stats into our structured format
+      connection.lastStats = this._parseRTCStats(rawStats);
+      connection.lastStatsTimestamp = Date.now();
+
+    } catch (error) {
+      logUnhandledError(error);
+    }
+  }
+
+  private _parseRTCStats(rawStats: any): RTCStatsSnapshot {
+    const snapshot: RTCStatsSnapshot = {};
+
+    // Parse inbound-rtp for video
+    const inboundVideo = rawStats['inbound-rtp']?.find((r: any) => r.kind === 'video');
+    if (inboundVideo) {
+      const packetLossRate = inboundVideo.packetsReceived > 0
+        ? (inboundVideo.packetsLost / inboundVideo.packetsReceived) * 100
+        : 0;
+
+      snapshot.inboundVideo = {
+        packetsReceived: inboundVideo.packetsReceived || 0,
+        packetsLost: inboundVideo.packetsLost || 0,
+        packetLossRate: Math.round(packetLossRate * 100) / 100,
+        jitter: (inboundVideo.jitter || 0) * 1000, // Convert to ms
+        bytesReceived: inboundVideo.bytesReceived || 0,
+        bitrate: 0, // Will be calculated from deltas in polling
+        framesPerSecond: inboundVideo.framesPerSecond,
+        framesDecoded: inboundVideo.framesDecoded,
+        frameWidth: inboundVideo.frameWidth,
+        frameHeight: inboundVideo.frameHeight,
+        freezeCount: inboundVideo.freezeCount,
+        totalFreezesDuration: inboundVideo.totalFreezesDuration,
+      };
+    }
+
+    // Parse inbound-rtp for audio
+    const inboundAudio = rawStats['inbound-rtp']?.find((r: any) => r.kind === 'audio');
+    if (inboundAudio) {
+      const packetLossRate = inboundAudio.packetsReceived > 0
+        ? (inboundAudio.packetsLost / inboundAudio.packetsReceived) * 100
+        : 0;
+
+      snapshot.inboundAudio = {
+        packetsReceived: inboundAudio.packetsReceived || 0,
+        packetsLost: inboundAudio.packetsLost || 0,
+        packetLossRate: Math.round(packetLossRate * 100) / 100,
+        jitter: (inboundAudio.jitter || 0) * 1000,
+        bytesReceived: inboundAudio.bytesReceived || 0,
+        bitrate: 0,
+        audioLevel: inboundAudio.audioLevel,
+        concealedSamples: inboundAudio.concealedSamples,
+      };
+    }
+
+    // Parse outbound-rtp for video
+    const outboundVideo = rawStats['outbound-rtp']?.find((r: any) => r.kind === 'video');
+    if (outboundVideo) {
+      snapshot.outboundVideo = {
+        packetsSent: outboundVideo.packetsSent || 0,
+        bytesSent: outboundVideo.bytesSent || 0,
+        bitrate: 0,
+        framesPerSecond: outboundVideo.framesPerSecond,
+        framesEncoded: outboundVideo.framesEncoded,
+        frameWidth: outboundVideo.frameWidth,
+        frameHeight: outboundVideo.frameHeight,
+        qualityLimitationReason: outboundVideo.qualityLimitationReason,
+      };
+    }
+
+    // Parse outbound-rtp for audio
+    const outboundAudio = rawStats['outbound-rtp']?.find((r: any) => r.kind === 'audio');
+    if (outboundAudio) {
+      snapshot.outboundAudio = {
+        packetsSent: outboundAudio.packetsSent || 0,
+        bytesSent: outboundAudio.bytesSent || 0,
+        bitrate: 0,
+      };
+    }
+
+    // Parse candidate-pair (get the selected/active pair)
+    const candidatePairs = rawStats['candidate-pair'] || [];
+    const activePair = candidatePairs.find((p: any) => p.state === 'succeeded') || candidatePairs[0];
+    if (activePair) {
+      snapshot.candidatePair = {
+        state: activePair.state,
+        localCandidateType: activePair.localCandidateType || 'unknown',
+        remoteCandidateType: activePair.remoteCandidateType || 'unknown',
+        currentRoundTripTime: activePair.currentRoundTripTime,
+        availableOutgoingBitrate: activePair.availableOutgoingBitrate,
+      };
+    }
+
+    return snapshot;
+  }
+
+  enableRTCStatsPolling(intervalMs: number = 1000) {
+    if (this._rtcStatsPollingInterval)
+      clearInterval(this._rtcStatsPollingInterval);
+
+
+    this._rtcStatsPollingInterval = setInterval(async () => {
+      // Poll stats for all active connections
+      for (const connection of this._rtcConnections) {
+        if (connection.connectionState !== 'closed')
+          await this._requestRTCStats((connection as any)._internalId);
+
+      }
+    }, intervalMs);
+  }
+
+  disableRTCStatsPolling() {
+    if (this._rtcStatsPollingInterval) {
+      clearInterval(this._rtcStatsPollingInterval);
+      this._rtcStatsPollingInterval = undefined;
+    }
+  }
+
+  rtcConnections(): RTCConnectionData[] {
+    return this._rtcConnections;
+  }
+
+  getRTCConnection(id: string): RTCConnectionData | undefined {
+    return this._rtcConnections.find(c => c.id === id);
+  }
+
+  clearRTCConnections() {
+    this.disableRTCStatsPolling();
+    this._rtcConnections.length = 0;
+    this._rtcConnectionIdCounter = 0;
+  }
+
+  isRTCMonitoringEnabled(): boolean {
+    return this._rtcMonitoringEnabled;
   }
 
   private _handleNotificationShown(data: {

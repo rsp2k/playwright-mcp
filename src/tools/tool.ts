@@ -55,6 +55,79 @@ export type NotificationModalState = {
   notification: WebNotification;
 };
 
+export type RTCConnectionData = {
+  id: string;
+  origin: string;
+  timestamp: number;
+
+  connectionState: RTCPeerConnectionState;
+  iceConnectionState: RTCIceConnectionState;
+  iceGatheringState: RTCIceGatheringState;
+  signalingState: RTCSignalingState;
+
+  lastStats?: RTCStatsSnapshot;
+  lastStatsTimestamp?: number;
+
+  stateHistory: Array<{
+    timestamp: number;
+    connectionState: RTCPeerConnectionState;
+    iceConnectionState: RTCIceConnectionState;
+  }>;
+};
+
+export type RTCStatsSnapshot = {
+  inboundVideo?: {
+    packetsReceived: number;
+    packetsLost: number;
+    packetLossRate: number;
+    jitter: number;
+    bytesReceived: number;
+    bitrate: number;
+    framesPerSecond?: number;
+    framesDecoded?: number;
+    frameWidth?: number;
+    frameHeight?: number;
+    freezeCount?: number;
+    totalFreezesDuration?: number;
+  };
+
+  inboundAudio?: {
+    packetsReceived: number;
+    packetsLost: number;
+    packetLossRate: number;
+    jitter: number;
+    bytesReceived: number;
+    bitrate: number;
+    audioLevel?: number;
+    concealedSamples?: number;
+  };
+
+  outboundVideo?: {
+    packetsSent: number;
+    bytesSent: number;
+    bitrate: number;
+    framesPerSecond?: number;
+    framesEncoded?: number;
+    frameWidth?: number;
+    frameHeight?: number;
+    qualityLimitationReason?: string;
+  };
+
+  outboundAudio?: {
+    packetsSent: number;
+    bytesSent: number;
+    bitrate: number;
+  };
+
+  candidatePair?: {
+    state: string;
+    localCandidateType: string;
+    remoteCandidateType: string;
+    currentRoundTripTime?: number;
+    availableOutgoingBitrate?: number;
+  };
+};
+
 export type ModalState = FileUploadModalState | DialogModalState | NotificationModalState;
 
 export type Tool<Input extends z.Schema = z.Schema> = {

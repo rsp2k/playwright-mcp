@@ -24,7 +24,7 @@ import { EnvironmentIntrospector } from './environmentIntrospection.js';
 import { RequestInterceptor, RequestInterceptorOptions } from './requestInterceptor.js';
 import { ArtifactManagerRegistry } from './artifactManager.js';
 
-import type { Tool, WebNotification } from './tools/tool.js';
+import type { Tool, WebNotification, RTCConnectionData } from './tools/tool.js';
 import type { FullConfig } from './config.js';
 import type { BrowserContextFactory } from './browserContextFactory.js';
 import type { InjectionConfig } from './tools/codeInjection.js';
@@ -96,6 +96,9 @@ export class Context {
 
   // Browser notifications storage
   private _notifications: WebNotification[] = [];
+
+  // WebRTC connections storage
+  private _rtcConnections: RTCConnectionData[] = [];
 
   constructor(tools: Tool[], config: FullConfig, browserContextFactory: BrowserContextFactory, environmentIntrospector?: EnvironmentIntrospector) {
     this.tools = tools;
@@ -175,6 +178,28 @@ export class Context {
 
   clearNotifications(): void {
     this._notifications.length = 0;
+  }
+
+  // WebRTC connection management methods
+  addRTCConnection(connection: RTCConnectionData): void {
+    this._rtcConnections.push(connection);
+  }
+
+  rtcConnections(): RTCConnectionData[] {
+    return this._rtcConnections;
+  }
+
+  getRTCConnection(id: string): RTCConnectionData | undefined {
+    return this._rtcConnections.find(c => c.id === id);
+  }
+
+  clearRTCConnections(): void {
+    this._rtcConnections.length = 0;
+
+    // Also clear from all tabs
+    for (const tab of this.tabs())
+      tab.clearRTCConnections();
+
   }
 
   async newTab(): Promise<Tab> {

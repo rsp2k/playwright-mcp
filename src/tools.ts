@@ -36,6 +36,7 @@ import screenshot from './tools/screenshot.js';
 import themeManagement from './tools/themeManagement.js';
 import video from './tools/video.js';
 import wait from './tools/wait.js';
+import webrtc from './tools/webrtc.js';
 import mouse from './tools/mouse.js';
 
 import type { Tool } from './tools/tool.js';
@@ -65,6 +66,7 @@ export const allTools: Tool<any>[] = [
   ...themeManagement,
   ...video,
   ...wait,
+  ...webrtc,
 ];
 
 export function filteredTools(config: FullConfig) {
