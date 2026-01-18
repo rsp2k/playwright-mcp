@@ -68,6 +68,7 @@ const defaultConfig: FullConfig = {
     },
     contextOptions: {
       viewport: null,
+      colorScheme: 'dark',
     },
   },
   network: {
