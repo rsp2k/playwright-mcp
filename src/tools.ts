@@ -31,6 +31,7 @@ import pdf from './tools/pdf.js';
 import sensors from './tools/sensors.js';
 import requests from './tools/requests.js';
 import snapshot from './tools/snapshot.js';
+import storage from './tools/storage.js';
 import tabs from './tools/tabs.js';
 import screenshot from './tools/screenshot.js';
 import themeManagement from './tools/themeManagement.js';
@@ -62,6 +63,7 @@ export const allTools: Tool<any>[] = [
   ...screenshot,
   ...sensors,
   ...snapshot,
+  ...storage,
   ...tabs,
   ...themeManagement,
   ...video,
