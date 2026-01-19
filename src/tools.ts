@@ -26,6 +26,7 @@ import install from './tools/install.js';
 import keyboard from './tools/keyboard.js';
 import navigate from './tools/navigate.js';
 import network from './tools/network.js';
+import networkThrottle from './tools/network-throttle.js';
 import notifications from './tools/notifications.js';
 import pdf from './tools/pdf.js';
 import sensors from './tools/sensors.js';
@@ -56,6 +57,7 @@ export const allTools: Tool<any>[] = [
   ...keyboard,
   ...navigate,
   ...network,
+  ...networkThrottle,
   ...notifications,
   ...mouse,
   ...pdf,
