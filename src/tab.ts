@@ -30,6 +30,33 @@ type PageEx = playwright.Page & {
   _snapshotForAI: () => Promise<string>;
 };
 
+const SNAPSHOT_TIMEOUT_MS = 10000; // 10 seconds
+
+async function snapshotWithTimeout(page: playwright.Page): Promise<string> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<string>((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve(
+        `[Snapshot timed out after ${SNAPSHOT_TIMEOUT_MS / 1000} seconds]\n` +
+        `This can happen with complex pages, SVG files, or file:// URLs.\n` +
+        `Use browser_take_screenshot to view the page, or disable auto-snapshots with browser_configure_snapshots.`
+      );
+    }, SNAPSHOT_TIMEOUT_MS);
+  });
+
+  try {
+    const result = await Promise.race([
+      (page as PageEx)._snapshotForAI(),
+      timeoutPromise,
+    ]);
+    return result;
+  } finally {
+    if (timeoutId)
+      clearTimeout(timeoutId);
+  }
+}
+
 export const TabEvents = {
   modalState: 'modalState'
 };
@@ -914,7 +941,7 @@ export class Tab extends EventEmitter<TabEventsInterface> {
     result.push(...this._listDownloadsMarkdown());
 
     await this._raceAgainstModalStates(async () => {
-      const snapshot = await (this.page as PageEx)._snapshotForAI();
+      const snapshot = await snapshotWithTimeout(this.page);
       result.push(
           `### Page state`,
           `- Page URL: ${this.page.url()}`,
@@ -958,7 +985,7 @@ export class Tab extends EventEmitter<TabEventsInterface> {
   }
 
   async refLocators(params: { element: string, ref: string }[]): Promise<playwright.Locator[]> {
-    const snapshot = await (this.page as PageEx)._snapshotForAI();
+    const snapshot = await snapshotWithTimeout(this.page);
     return params.map(param => {
       if (!snapshot.includes(`[ref=${param.ref}]`))
         throw new Error(`Ref ${param.ref} not found in the current page snapshot. Try capturing new snapshot.`);
