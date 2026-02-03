@@ -29,6 +29,7 @@ import network from './tools/network.js';
 import networkThrottle from './tools/network-throttle.js';
 import notifications from './tools/notifications.js';
 import pdf from './tools/pdf.js';
+import pwa from './tools/pwa.js';
 import sensors from './tools/sensors.js';
 import requests from './tools/requests.js';
 import snapshot from './tools/snapshot.js';
@@ -61,6 +62,7 @@ export const allTools: Tool<any>[] = [
   ...notifications,
   ...mouse,
   ...pdf,
+  ...pwa,
   ...requests,
   ...screenshot,
   ...sensors,

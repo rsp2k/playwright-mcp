@@ -14,6 +14,7 @@ A Model Context Protocol (MCP) server that provides browser automation capabilit
 - **🎬 Intelligent video recording**. Smart pause/resume modes eliminate dead time for professional demo videos with automatic viewport matching.
 - **🎨 Custom code injection**. Inject JavaScript/CSS into pages for enhanced automation, with memory-leak-free cleanup and session persistence.
 - **📁 Centralized artifact management**. Session-based organization of screenshots, videos, and PDFs with comprehensive audit logging.
+- **📦 PWA analysis and download**. Inspect Progressive Web Apps and download complete packages including manifest, icons, service worker, and cached resources.
 - **🔧 Enterprise-ready**. Memory leak prevention, comprehensive error handling, and production-tested browser automation patterns.
 
 ### Requirements
@@ -631,6 +632,14 @@ http.createServer(async (req, res) => {
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_clear_network_conditions**
+  - Title: Remove network throttling
+  - Description: Remove all network throttling and restore full network speed. Equivalent to setting preset "no-throttle".
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_clear_notifications**
   - Title: Clear notification history
   - Description: Clear all captured notifications from the session history.
@@ -650,6 +659,23 @@ http.createServer(async (req, res) => {
 - **browser_clear_requests**
   - Title: Clear captured requests
   - Description: Clear all captured HTTP request data from memory. Useful for freeing up memory during long sessions or when starting fresh analysis.
+  - Parameters: None
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_clear_storage**
+  - Title: Clear web storage
+  - Description: Clear localStorage, sessionStorage, or both for the current page.
+  - Parameters:
+    - `type` (string): Storage type to clear: "local", "session", or "both"
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_clear_webrtc_data**
+  - Title: Clear WebRTC data
+  - Description: Clear all captured WebRTC connection data and statistics from session history. Also stops monitoring if active.
   - Parameters: None
   - Read-only: **false**
 
@@ -787,6 +813,17 @@ Note: filterPreset and jqExpression are mutually exclusive. Preset takes precede
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_delete_cookies**
+  - Title: Delete browser cookies
+  - Description: Delete cookies by name, domain, or path. If no filters provided, clears all cookies.
+  - Parameters:
+    - `name` (string, optional): Delete cookies with this name
+    - `domain` (string, optional): Delete cookies for this domain
+    - `path` (string, optional): Delete cookies with this path
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_disable_debug_toolbar**
   - Title: Disable Debug Toolbar
   - Description: Disable the debug toolbar for the current session
@@ -908,6 +945,23 @@ This is the FIRST conversational browser automation MCP server!
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_get_cookies**
+  - Title: Get browser cookies
+  - Description: List all cookies for the current browser context. Optionally filter by domain or URL.
+  - Parameters:
+    - `urls` (array, optional): Filter cookies by specific URLs. If not provided, returns all cookies.
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_get_network_conditions**
+  - Title: Get current network throttling settings
+  - Description: Get the current network throttling configuration. Returns preset name if using a preset, or custom values if manually configured.
+  - Parameters: None
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_get_requests**
   - Title: Get captured requests
   - Description: Retrieve and analyze captured HTTP requests with pagination support. Shows timing, status codes, headers, and bodies. Large request lists are automatically paginated for better performance.
@@ -922,6 +976,37 @@ This is the FIRST conversational browser automation MCP server!
     - `status` (number, optional): Filter requests by HTTP status code
     - `format` (string, optional): Response format: summary (basic info), detailed (full data), stats (statistics only)
     - `slowThreshold` (number, optional): Threshold in milliseconds for considering requests "slow" (default: 1000ms)
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_get_storage**
+  - Title: Get web storage contents
+  - Description: Get all key-value pairs from localStorage or sessionStorage for the current page.
+  - Parameters:
+    - `type` (string): Storage type: "local" for localStorage, "session" for sessionStorage
+    - `key` (string, optional): Get a specific key value instead of all items
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_get_webrtc_connections**
+  - Title: Get WebRTC connections
+  - Description: List all WebRTC connections captured during this session. Shows connection states, ICE states, and origin. Use browser_get_webrtc_stats for detailed statistics.
+  - Parameters:
+    - `connectionState` (string, optional): Filter by connection state
+    - `iceConnectionState` (string, optional): Filter by ICE connection state
+    - `origin` (string, optional): Filter by origin URL
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_get_webrtc_stats**
+  - Title: Get WebRTC statistics
+  - Description: Get detailed real-time statistics for WebRTC connections. Includes bitrate, packet loss, jitter, RTT, frames per second, and quality metrics. Essential for diagnosing call quality issues.
+  - Parameters:
+    - `connectionId` (string, optional): Specific connection ID (from browser_get_webrtc_connections). If omitted, shows stats for all connections.
+    - `includeRaw` (boolean, optional): Include raw stats data for debugging (default: false)
   - Read-only: **true**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -1172,6 +1257,27 @@ Full API: See MODEL-COLLABORATION-API.md
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_pwa_download**
+  - Title: Download PWA package
+  - Description: Download complete Progressive Web App (PWA) package including manifest, icons, service worker, and cached resources.
+  - Parameters:
+    - `outputDir` (string, optional): Custom output directory path. If not specified, uses default artifact directory.
+    - `includeIcons` (boolean, optional): Download all icon sizes from manifest (default: true)
+    - `includeCache` (boolean, optional): Download cached resources from CacheStorage (default: true)
+    - `createZip` (boolean, optional): Create zip archive of downloaded content (default: false)
+    - `maxCacheSize` (number, optional): Maximum total cache size to download in MB (default: 100)
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_pwa_info**
+  - Title: Get PWA information
+  - Description: Detect and report Progressive Web App (PWA) metadata for the current page including manifest, service worker, and cache information.
+  - Parameters: None
+  - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_recording_status**
   - Title: Get video recording status
   - Description: Check if video recording is currently enabled and get recording details. Use this to verify recording is active before performing actions, or to check output directory and settings.
@@ -1221,6 +1327,23 @@ Full API: See MODEL-COLLABORATION-API.md
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
     - `values` (array): Array of values to select in the dropdown. This can be a single value or multiple values.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_set_cookie**
+  - Title: Set a browser cookie
+  - Description: Set a cookie with specified name, value, and optional attributes. Requires either url or domain+path.
+  - Parameters:
+    - `name` (string): Cookie name
+    - `value` (string): Cookie value
+    - `url` (string, optional): URL to associate with the cookie. Either url or domain must be specified.
+    - `domain` (string, optional): Cookie domain. Either url or domain must be specified.
+    - `path` (string, optional): Cookie path (default: "/")
+    - `expires` (number, optional): Unix timestamp in seconds for cookie expiration. -1 for session cookie.
+    - `httpOnly` (boolean, optional): Whether the cookie is HTTP only (default: false)
+    - `secure` (boolean, optional): Whether the cookie is secure (default: false)
+    - `sameSite` (string, optional): SameSite attribute (default: "Lax")
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -1292,6 +1415,29 @@ Full API: See MODEL-COLLABORATION-API.md
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_set_network_conditions**
+  - Title: Set network throttling conditions
+  - Description: Simulate slow network conditions using Chrome DevTools Protocol. Choose from presets or specify custom values.
+
+**Presets:**
+- offline: Block all network requests
+- slow-3g: ~400 kbps, 2s latency (poor mobile)
+- fast-3g: ~1.5 Mbps, 563ms latency (typical 3G)
+- regular-4g: ~12 Mbps, 170ms latency (LTE)
+- wifi: ~24 Mbps, 28ms latency (home WiFi)
+- no-throttle: Remove all throttling
+
+**Note:** This feature requires a Chromium-based browser (Chrome, Edge). Firefox and WebKit are not supported.
+  - Parameters:
+    - `preset` (string, optional): Network condition preset. Use "offline" to block all requests, "slow-3g" for poor mobile, "fast-3g" for typical mobile, "regular-4g" for LTE, "wifi" for home WiFi, or "no-throttle" to remove throttling.
+    - `downloadThroughput` (number, optional): Custom download speed in bytes/second. Use -1 for no throttling. Overrides preset if specified.
+    - `uploadThroughput` (number, optional): Custom upload speed in bytes/second. Use -1 for no throttling. Overrides preset if specified.
+    - `latency` (number, optional): Custom latency in milliseconds to add to each request. Overrides preset if specified.
+    - `offline` (boolean, optional): Set to true to simulate offline mode. Overrides preset if specified.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_set_offline**
   - Title: Set browser offline mode
   - Description: Toggle browser offline mode on/off (equivalent to DevTools offline checkbox)
@@ -1310,6 +1456,17 @@ Full API: See MODEL-COLLABORATION-API.md
 • smart: Automatically pause during waits, resume during actions (RECOMMENDED for clean demo videos)
 • action-only: Only record during active browser interactions, minimal recording time
 • segment: Create separate video files for each action sequence (useful for splitting demos into clips)
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_set_storage**
+  - Title: Set web storage item
+  - Description: Set a key-value pair in localStorage or sessionStorage for the current page.
+  - Parameters:
+    - `type` (string): Storage type: "local" for localStorage, "session" for sessionStorage
+    - `key` (string): Storage key
+    - `value` (string): Storage value (will be stored as string)
   - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -1346,6 +1503,15 @@ Full API: See MODEL-COLLABORATION-API.md
 
 <!-- NOTE: This has been generated via update-readme.js -->
 
+- **browser_start_webrtc_monitoring**
+  - Title: Start WebRTC monitoring
+  - Description: Enable real-time WebRTC connection monitoring. Intercepts RTCPeerConnection API to track connection states and collect statistics. Required before using other WebRTC tools.
+  - Parameters:
+    - `statsPollingInterval` (number, optional): Stats collection interval in milliseconds (default: 1000ms). Lower values give more frequent updates but use more CPU.
+  - Read-only: **false**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
 - **browser_status**
   - Title: Get browser status and capabilities
   - Description: Get current browser configuration status including mode (isolated/persistent), profile path, and available capabilities like Push API support.
@@ -1359,6 +1525,14 @@ Full API: See MODEL-COLLABORATION-API.md
   - Description: Finalize video recording session and return paths to all recorded video files (.webm format). Automatically closes browser pages to ensure videos are properly saved and available for use. Essential final step for completing video recording workflows and accessing demo files.
   - Parameters: None
   - Read-only: **true**
+
+<!-- NOTE: This has been generated via update-readme.js -->
+
+- **browser_stop_webrtc_monitoring**
+  - Title: Stop WebRTC monitoring
+  - Description: Stop collecting WebRTC statistics. Captured connection data is preserved and can still be queried. Use browser_clear_webrtc_data to also clear historical data.
+  - Parameters: None
+  - Read-only: **false**
 
 <!-- NOTE: This has been generated via update-readme.js -->
 

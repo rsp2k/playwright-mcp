@@ -75,6 +75,8 @@ test('test snapshot tool list', async ({ client }) => {
     'browser_network_requests',
     'browser_pause_recording',
     'browser_press_key',
+    'browser_pwa_download',
+    'browser_pwa_info',
     'browser_recording_status',
     'browser_request_monitoring_status',
     'browser_resize',
