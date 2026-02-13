@@ -31,7 +31,7 @@ const startMonitoringSchema = z.object({
 
   captureBody: z.boolean().optional().default(true).describe('Whether to capture request and response bodies (default: true)'),
 
-  maxBodySize: z.number().optional().default(10485760).describe('Maximum body size to capture in bytes (default: 10MB). Larger bodies will be truncated'),
+  maxBodySize: z.coerce.number().optional().default(10485760).describe('Maximum body size to capture in bytes (default: 10MB). Larger bodies will be truncated'),
 
   autoSave: z.boolean().optional().default(false).describe('Automatically save captured requests after each response (default: false for performance)'),
 
@@ -45,11 +45,11 @@ const getRequestsSchema = paginationParamsSchema.extend({
 
   method: z.string().optional().describe('Filter requests by HTTP method (GET, POST, etc.)'),
 
-  status: z.number().optional().describe('Filter requests by HTTP status code'),
+  status: z.coerce.number().optional().describe('Filter requests by HTTP status code'),
 
   format: z.enum(['summary', 'detailed', 'stats']).optional().default('summary').describe('Response format: summary (basic info), detailed (full data), stats (statistics only)'),
 
-  slowThreshold: z.number().optional().default(1000).describe('Threshold in milliseconds for considering requests "slow" (default: 1000ms)')
+  slowThreshold: z.coerce.number().optional().default(1000).describe('Threshold in milliseconds for considering requests "slow" (default: 1000ms)')
 });
 
 const exportRequestsSchema = z.object({

@@ -24,15 +24,15 @@ import type { Response } from '../response.js';
 const configureSchema = z.object({
   headless: z.boolean().optional().describe('Whether to run the browser in headless mode'),
   viewport: z.object({
-    width: z.number(),
-    height: z.number(),
+    width: z.coerce.number(),
+    height: z.coerce.number(),
   }).optional().describe('Browser viewport size'),
   userAgent: z.string().optional().describe('User agent string for the browser'),
   device: z.string().optional().describe('Device to emulate (e.g., "iPhone 13", "iPad", "Pixel 5"). Use browser_list_devices to see available devices.'),
   geolocation: z.object({
-    latitude: z.number().min(-90).max(90),
-    longitude: z.number().min(-180).max(180),
-    accuracy: z.number().min(0).optional().describe('Accuracy in meters (default: 100)')
+    latitude: z.coerce.number().min(-90).max(90),
+    longitude: z.coerce.number().min(-180).max(180),
+    accuracy: z.coerce.number().min(0).optional().describe('Accuracy in meters (default: 100)')
   }).optional().describe('Set geolocation coordinates'),
   locale: z.string().optional().describe('Browser locale (e.g., "en-US", "fr-FR", "ja-JP")'),
   timezone: z.string().optional().describe('Timezone ID (e.g., "America/New_York", "Europe/London", "Asia/Tokyo")'),
@@ -46,7 +46,7 @@ const configureSchema = z.object({
 
   // Browser UI Customization Options
   chromiumSandbox: z.boolean().optional().describe('Enable/disable Chromium sandbox (affects browser appearance)'),
-  slowMo: z.number().min(0).optional().describe('Slow down operations by specified milliseconds (helps with visual tracking)'),
+  slowMo: z.coerce.number().min(0).optional().describe('Slow down operations by specified milliseconds (helps with visual tracking)'),
   devtools: z.boolean().optional().describe('Open browser with DevTools panel open (Chromium only)'),
   args: z.array(z.string()).optional().describe('Additional browser launch arguments for UI customization (e.g., ["--force-color-profile=srgb", "--disable-features=VizDisplayCompositor"])'),
 });
@@ -93,7 +93,7 @@ const installPopularExtensionSchema = z.object({
 
 const configureSnapshotsSchema = z.object({
   includeSnapshots: z.boolean().optional().describe('Enable/disable automatic snapshots after interactive operations. When false, use browser_snapshot for explicit snapshots.'),
-  maxSnapshotTokens: z.number().min(0).optional().describe('Maximum tokens allowed in snapshots before truncation. Use 0 to disable truncation.'),
+  maxSnapshotTokens: z.coerce.number().min(0).optional().describe('Maximum tokens allowed in snapshots before truncation. Use 0 to disable truncation.'),
   differentialSnapshots: z.boolean().optional().describe('Enable differential snapshots that show only changes since last snapshot instead of full page snapshots.'),
   differentialMode: z.enum(['semantic', 'simple', 'both']).optional().describe('Type of differential analysis: "semantic" (React-style reconciliation), "simple" (text diff), or "both" (show comparison).'),
   consoleOutputFile: z.string().optional().describe('File path to write browser console output to. Set to empty string to disable console file output.'),
@@ -104,9 +104,9 @@ const configureSnapshotsSchema = z.object({
   filterMode: z.enum(['content', 'count', 'files']).optional().describe('Type of filtering output: "content" (filtered data), "count" (match statistics), "files" (matching items only)'),
   caseSensitive: z.boolean().optional().describe('Case sensitive pattern matching (default: true)'),
   wholeWords: z.boolean().optional().describe('Match whole words only (default: false)'),
-  contextLines: z.number().min(0).optional().describe('Number of context lines around matches'),
+  contextLines: z.coerce.number().min(0).optional().describe('Number of context lines around matches'),
   invertMatch: z.boolean().optional().describe('Invert match to show non-matches (default: false)'),
-  maxMatches: z.number().min(1).optional().describe('Maximum number of matches to return'),
+  maxMatches: z.coerce.number().min(1).optional().describe('Maximum number of matches to return'),
 
   // jq Structural Filtering Parameters
   jqExpression: z.string().optional().describe(

@@ -565,7 +565,7 @@ const enableDebugToolbarSchema = z.object({
   theme: z.enum(['light', 'dark', 'transparent']).optional().describe('Visual theme: light (white), dark (gray), transparent (glass effect)'),
   minimized: z.boolean().optional().describe('Start in compact pill mode (default: false)'),
   showDetails: z.boolean().optional().describe('Show session details when expanded (default: true)'),
-  opacity: z.number().min(0.1).max(1.0).optional().describe('Toolbar opacity 0.1-1.0 (default: 0.95)')
+  opacity: z.coerce.number().min(0.1).max(1.0).optional().describe('Toolbar opacity 0.1-1.0 (default: 0.95)')
 });
 
 const injectCustomCodeSchema = z.object({
@@ -580,13 +580,13 @@ const enableVoiceCollaborationSchema = z.object({
   enabled: z.boolean().optional().describe('Enable voice collaboration features (default: true)'),
   autoInitialize: z.boolean().optional().describe('Automatically initialize voice on page load (default: true)'),
   voiceOptions: z.object({
-    rate: z.number().min(0.1).max(10).optional().describe('Speech rate (0.1-10, default: 1.0)'),
-    pitch: z.number().min(0).max(2).optional().describe('Speech pitch (0-2, default: 1.0)'),
-    volume: z.number().min(0).max(1).optional().describe('Speech volume (0-1, default: 1.0)'),
+    rate: z.coerce.number().min(0.1).max(10).optional().describe('Speech rate (0.1-10, default: 1.0)'),
+    pitch: z.coerce.number().min(0).max(2).optional().describe('Speech pitch (0-2, default: 1.0)'),
+    volume: z.coerce.number().min(0).max(1).optional().describe('Speech volume (0-1, default: 1.0)'),
     lang: z.string().optional().describe('Language code (default: en-US)')
   }).optional().describe('Voice synthesis options'),
   listenOptions: z.object({
-    timeout: z.number().min(1000).max(60000).optional().describe('Voice input timeout in milliseconds (default: 10000)'),
+    timeout: z.coerce.number().min(1000).max(60000).optional().describe('Voice input timeout in milliseconds (default: 10000)'),
     lang: z.string().optional().describe('Speech recognition language (default: en-US)'),
     continuous: z.boolean().optional().describe('Keep listening after first result (default: false)')
   }).optional().describe('Voice recognition options')

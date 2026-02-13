@@ -25,7 +25,7 @@ const wait = defineTool({
     title: 'Wait for',
     description: 'Wait for text to appear or disappear or a specified time to pass. In smart recording mode, video recording is automatically paused during waits unless recordDuringWait is true.',
     inputSchema: z.object({
-      time: z.number().optional().describe('The time to wait in seconds'),
+      time: z.coerce.number().optional().describe('The time to wait in seconds'),
       text: z.string().optional().describe('The text to wait for'),
       textGone: z.string().optional().describe('The text to wait for to disappear'),
       recordDuringWait: z.boolean().optional().default(false).describe('Whether to keep video recording active during the wait (default: false in smart mode, true in continuous mode)'),

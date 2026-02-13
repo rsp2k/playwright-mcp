@@ -83,7 +83,7 @@ const setCookie = defineTool({
       url: z.string().optional().describe('URL to associate with the cookie. Either url or domain must be specified.'),
       domain: z.string().optional().describe('Cookie domain. Either url or domain must be specified.'),
       path: z.string().optional().describe('Cookie path (default: "/")'),
-      expires: z.number().optional().describe('Unix timestamp in seconds for cookie expiration. -1 for session cookie.'),
+      expires: z.coerce.number().optional().describe('Unix timestamp in seconds for cookie expiration. -1 for session cookie.'),
       httpOnly: z.boolean().optional().describe('Whether the cookie is HTTP only (default: false)'),
       secure: z.boolean().optional().describe('Whether the cookie is secure (default: false)'),
       sameSite: z.enum(['Strict', 'Lax', 'None']).optional().describe('SameSite attribute (default: "Lax")'),

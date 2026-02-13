@@ -22,13 +22,13 @@ const elementSchema = z.object({
 });
 
 const coordinateSchema = z.object({
-  x: z.number().describe('X coordinate'),
-  y: z.number().describe('Y coordinate'),
+  x: z.coerce.number().describe('X coordinate'),
+  y: z.coerce.number().describe('Y coordinate'),
 });
 
 const advancedCoordinateSchema = coordinateSchema.extend({
   precision: z.enum(['pixel', 'subpixel']).optional().default('pixel').describe('Coordinate precision level'),
-  delay: z.number().min(0).max(5000).optional().describe('Delay in milliseconds before action'),
+  delay: z.coerce.number().min(0).max(5000).optional().describe('Delay in milliseconds before action'),
 });
 
 const mouseMove = defineTabTool({
@@ -64,8 +64,8 @@ const mouseClick = defineTabTool({
     description: 'Click mouse button at a given position with advanced options',
     inputSchema: elementSchema.extend(advancedCoordinateSchema.shape).extend({
       button: z.enum(['left', 'right', 'middle']).optional().default('left').describe('Mouse button to click'),
-      clickCount: z.number().min(1).max(3).optional().default(1).describe('Number of clicks (1=single, 2=double, 3=triple)'),
-      holdTime: z.number().min(0).max(2000).optional().default(0).describe('How long to hold button down in milliseconds'),
+      clickCount: z.coerce.number().min(1).max(3).optional().default(1).describe('Number of clicks (1=single, 2=double, 3=triple)'),
+      holdTime: z.coerce.number().min(0).max(2000).optional().default(0).describe('How long to hold button down in milliseconds'),
     }),
     type: 'destructive',
   },
@@ -111,16 +111,16 @@ const mouseDrag = defineTabTool({
     title: 'Drag mouse',
     description: 'Drag mouse button from start to end position with advanced drag patterns',
     inputSchema: elementSchema.extend({
-      startX: z.number().describe('Start X coordinate'),
-      startY: z.number().describe('Start Y coordinate'),
-      endX: z.number().describe('End X coordinate'),
-      endY: z.number().describe('End Y coordinate'),
+      startX: z.coerce.number().describe('Start X coordinate'),
+      startY: z.coerce.number().describe('Start Y coordinate'),
+      endX: z.coerce.number().describe('End X coordinate'),
+      endY: z.coerce.number().describe('End Y coordinate'),
       button: z.enum(['left', 'right', 'middle']).optional().default('left').describe('Mouse button to drag with'),
       precision: z.enum(['pixel', 'subpixel']).optional().default('pixel').describe('Coordinate precision level'),
       pattern: z.enum(['direct', 'smooth', 'bezier']).optional().default('direct').describe('Drag movement pattern'),
-      steps: z.number().min(1).max(50).optional().default(10).describe('Number of intermediate steps for smooth/bezier patterns'),
-      duration: z.number().min(100).max(10000).optional().describe('Total drag duration in milliseconds'),
-      delay: z.number().min(0).max(5000).optional().describe('Delay before starting drag'),
+      steps: z.coerce.number().min(1).max(50).optional().default(10).describe('Number of intermediate steps for smooth/bezier patterns'),
+      duration: z.coerce.number().min(100).max(10000).optional().describe('Total drag duration in milliseconds'),
+      delay: z.coerce.number().min(0).max(5000).optional().describe('Delay before starting drag'),
     }),
     type: 'destructive',
   },
@@ -209,8 +209,8 @@ const mouseScroll = defineTabTool({
     title: 'Scroll at coordinates',
     description: 'Perform scroll action at specific coordinates with precision control',
     inputSchema: elementSchema.extend(advancedCoordinateSchema.shape).extend({
-      deltaX: z.number().optional().default(0).describe('Horizontal scroll amount (positive = right, negative = left)'),
-      deltaY: z.number().describe('Vertical scroll amount (positive = down, negative = up)'),
+      deltaX: z.coerce.number().optional().default(0).describe('Horizontal scroll amount (positive = right, negative = left)'),
+      deltaY: z.coerce.number().describe('Vertical scroll amount (positive = down, negative = up)'),
       smooth: z.boolean().optional().default(false).describe('Use smooth scrolling animation'),
     }),
     type: 'destructive',
@@ -256,9 +256,9 @@ const mouseGesture = defineTabTool({
     description: 'Perform complex mouse gestures with multiple waypoints',
     inputSchema: elementSchema.extend({
       points: z.array(z.object({
-        x: z.number().describe('X coordinate'),
-        y: z.number().describe('Y coordinate'),
-        delay: z.number().min(0).max(5000).optional().describe('Delay at this point in milliseconds'),
+        x: z.coerce.number().describe('X coordinate'),
+        y: z.coerce.number().describe('Y coordinate'),
+        delay: z.coerce.number().min(0).max(5000).optional().describe('Delay at this point in milliseconds'),
         action: z.enum(['move', 'click', 'down', 'up']).optional().default('move').describe('Action at this point'),
       })).min(2).describe('Array of points defining the gesture path'),
       button: z.enum(['left', 'right', 'middle']).optional().default('left').describe('Mouse button for click actions'),

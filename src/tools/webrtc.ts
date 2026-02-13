@@ -28,7 +28,7 @@ const startWebRTCMonitoring = defineTabTool({
     title: 'Start WebRTC monitoring',
     description: 'Enable real-time WebRTC connection monitoring. Intercepts RTCPeerConnection API to track connection states and collect statistics. Required before using other WebRTC tools.',
     inputSchema: z.object({
-      statsPollingInterval: z.number().optional().describe('Stats collection interval in milliseconds (default: 1000ms). Lower values give more frequent updates but use more CPU.'),
+      statsPollingInterval: z.coerce.number().optional().describe('Stats collection interval in milliseconds (default: 1000ms). Lower values give more frequent updates but use more CPU.'),
     }),
     type: 'destructive',
   },

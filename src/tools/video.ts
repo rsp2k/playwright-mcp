@@ -28,8 +28,8 @@ const startRecording = defineTool({
     description: 'Start recording browser session video with intelligent viewport matching. For best results, the browser viewport size should match the video recording size to avoid gray space around content. Use browser_configure to set viewport size before recording.',
     inputSchema: z.object({
       size: z.object({
-        width: z.number().optional().describe('Video width in pixels (default: 1280). For full-frame content, set browser viewport to match this width.'),
-        height: z.number().optional().describe('Video height in pixels (default: 720). For full-frame content, set browser viewport to match this height.'),
+        width: z.coerce.number().optional().describe('Video width in pixels (default: 1280). For full-frame content, set browser viewport to match this width.'),
+        height: z.coerce.number().optional().describe('Video height in pixels (default: 720). For full-frame content, set browser viewport to match this height.'),
       }).optional().describe('Video recording dimensions. IMPORTANT: Browser viewport should match these dimensions to avoid gray borders around content.'),
       filename: z.string().optional().describe('Base filename for video files (default: session-{timestamp}.webm)'),
       autoSetViewport: z.boolean().optional().default(true).describe('Automatically set browser viewport to match video recording size (recommended for full-frame content)'),

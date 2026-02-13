@@ -42,7 +42,7 @@ const selectTab = defineTool({
     title: 'Select a tab',
     description: 'Select a tab by index. Returns page snapshot after selecting tab (configurable via browser_configure_snapshots).',
     inputSchema: z.object({
-      index: z.number().describe('The index of the tab to select'),
+      index: z.coerce.number().describe('The index of the tab to select'),
     }),
     type: 'readOnly',
   },
@@ -82,7 +82,7 @@ const closeTab = defineTool({
     title: 'Close a tab',
     description: 'Close a tab. Returns page snapshot after closing tab (configurable via browser_configure_snapshots).',
     inputSchema: z.object({
-      index: z.number().optional().describe('The index of the tab to close. Closes current tab if not provided.'),
+      index: z.coerce.number().optional().describe('The index of the tab to close. Closes current tab if not provided.'),
     }),
     type: 'destructive',
   },

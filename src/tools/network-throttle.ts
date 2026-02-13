@@ -98,11 +98,11 @@ const currentNetworkConditions = new WeakMap<Context, {
 const setNetworkConditionsSchema = z.object({
   preset: z.enum(['offline', 'slow-3g', 'fast-3g', 'regular-4g', 'wifi', 'no-throttle']).optional()
     .describe('Network condition preset. Use "offline" to block all requests, "slow-3g" for poor mobile, "fast-3g" for typical mobile, "regular-4g" for LTE, "wifi" for home WiFi, or "no-throttle" to remove throttling.'),
-  downloadThroughput: z.number().min(-1).optional()
+  downloadThroughput: z.coerce.number().min(-1).optional()
     .describe('Custom download speed in bytes/second. Use -1 for no throttling. Overrides preset if specified.'),
-  uploadThroughput: z.number().min(-1).optional()
+  uploadThroughput: z.coerce.number().min(-1).optional()
     .describe('Custom upload speed in bytes/second. Use -1 for no throttling. Overrides preset if specified.'),
-  latency: z.number().min(0).optional()
+  latency: z.coerce.number().min(0).optional()
     .describe('Custom latency in milliseconds to add to each request. Overrides preset if specified.'),
   offline: z.boolean().optional()
     .describe('Set to true to simulate offline mode. Overrides preset if specified.')

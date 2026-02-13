@@ -40,10 +40,10 @@ const resize = defineTabTool({
   schema: {
     name: 'browser_resize',
     title: 'Resize browser window',
-    description: 'Resize the browser window',
+    description: 'Resize the browser viewport to the specified width and height in pixels. Common sizes: 1920x1080 (Full HD), 1440x900 (laptop), 1280x720 (HD), 390x844 (mobile).',
     inputSchema: z.object({
-      width: z.number().describe('Width of the browser window'),
-      height: z.number().describe('Height of the browser window'),
+      width: z.coerce.number().describe('Viewport width in pixels'),
+      height: z.coerce.number().describe('Viewport height in pixels'),
     }),
     type: 'readOnly',
   },

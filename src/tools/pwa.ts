@@ -307,7 +307,7 @@ const pwaDownload = defineTabTool({
       includeIcons: z.boolean().optional().default(true).describe('Download all icon sizes from manifest (default: true)'),
       includeCache: z.boolean().optional().default(true).describe('Download cached resources from CacheStorage (default: true)'),
       createZip: z.boolean().optional().default(false).describe('Create zip archive of downloaded content (default: false)'),
-      maxCacheSize: z.number().optional().default(100).describe('Maximum total cache size to download in MB (default: 100)'),
+      maxCacheSize: z.coerce.number().optional().default(100).describe('Maximum total cache size to download in MB (default: 100)'),
     }),
     type: 'destructive',
   },
