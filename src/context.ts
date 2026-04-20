@@ -23,12 +23,13 @@ import { Tab } from './tab.js';
 import { EnvironmentIntrospector } from './environmentIntrospection.js';
 import { RequestInterceptor, RequestInterceptorOptions } from './requestInterceptor.js';
 import { ArtifactManagerRegistry } from './artifactManager.js';
+import { launchWithAutoInstall } from './browserContextFactory.js';
+import { PlaywrightRipgrepEngine } from './filtering/engine.js';
 
 import type { Tool, WebNotification, RTCConnectionData } from './tools/tool.js';
 import type { FullConfig } from './config.js';
 import type { BrowserContextFactory } from './browserContextFactory.js';
 import type { InjectionConfig } from './tools/codeInjection.js';
-import { PlaywrightRipgrepEngine } from './filtering/engine.js';
 import type { DifferentialFilterParams } from './filtering/models.js';
 
 // Virtual Accessibility Tree for React-style reconciliation
@@ -466,7 +467,7 @@ export class Context {
       ];
     }
 
-    const browser = await browserType.launch(launchOptions);
+    const browser = await launchWithAutoInstall(this.config.browser, launchOptions, browserType);
 
     // Use environment-specific video directory if available
     const videoConfig = envOptions.recordVideo ?

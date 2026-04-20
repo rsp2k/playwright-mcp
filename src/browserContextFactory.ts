@@ -22,6 +22,7 @@ import os from 'node:os';
 import * as playwright from 'playwright';
 
 import { logUnhandledError, testDebug } from './log.js';
+import { installBrowser, isMissingBrowserError } from './browserInstaller.js';
 
 import type { FullConfig } from './config.js';
 
@@ -136,11 +137,7 @@ class IsolatedContextFactory extends BaseContextFactory {
       ];
     }
 
-    return browserType.launch(launchOptions).catch(error => {
-      if (error.message.includes('Executable doesn\'t exist'))
-        throw new Error(`Browser specified in your config is not installed. Either install it (likely) or change the config.`);
-      throw error;
-    });
+    return launchWithAutoInstall(this.browserConfig, launchOptions, browserType);
   }
 
   protected override async _doCreateContext(browser: playwright.Browser, extensionPaths?: string[]): Promise<playwright.BrowserContext> {
@@ -217,14 +214,19 @@ class PersistentContextFactory implements BrowserContextFactory {
     }
 
     const browserType = playwright[this.browserConfig.browserName];
+    let didAutoInstall = false;
     for (let i = 0; i < 5; i++) {
       try {
         const browserContext = await browserType.launchPersistentContext(userDataDir, launchOptions);
         const close = () => this._closeBrowserContext(browserContext, userDataDir);
         return { browserContext, close };
       } catch (error: any) {
-        if (error.message.includes('Executable doesn\'t exist'))
-          throw new Error(`Browser specified in your config is not installed. Either install it (likely) or change the config.`);
+        if (!didAutoInstall && isMissingBrowserError(error)) {
+          testDebug('browser missing, attempting auto-install (persistent)');
+          didAutoInstall = true;
+          await installBrowser(this.browserConfig);
+          continue;
+        }
         if (error.message.includes('ProcessSingleton') || error.message.includes('Invalid URL')) {
           // User data directory is already in use, try again.
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -274,4 +276,25 @@ async function findFreePort(): Promise<number> {
     });
     server.on('error', reject);
   });
+}
+
+/**
+ * Launches the given browser, auto-installing it if the executable is missing.
+ * Only retries once — if install succeeds and launch still fails, we surface
+ * the original error to the caller.
+ */
+export async function launchWithAutoInstall(
+  browserConfig: FullConfig['browser'],
+  launchOptions: playwright.LaunchOptions,
+  browserType: playwright.BrowserType,
+): Promise<playwright.Browser> {
+  try {
+    return await browserType.launch(launchOptions);
+  } catch (error) {
+    if (!isMissingBrowserError(error))
+      throw error;
+    testDebug('browser missing, attempting auto-install (isolated)');
+    await installBrowser(browserConfig);
+    return browserType.launch(launchOptions);
+  }
 }
