@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-import { fork } from 'node:child_process';
+import { fork, spawn } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -62,6 +63,12 @@ async function runInstall(target: string): Promise<void> {
 
   await runPlaywrightCli(cliPath, ['install', target]);
 
+  // macOS: strip Gatekeeper quarantine attribute from freshly downloaded
+  // browser binaries. Without this, the first launch is silently blocked
+  // by macOS on a fresh install.
+  if (process.platform === 'darwin')
+    await stripDarwinQuarantine();
+
   // Best-effort system-deps install. Only runs when we're already root,
   // otherwise skipped silently — users will see Playwright's own missing-lib
   // error on the next launch, which tells them exactly what to apt install.
@@ -72,6 +79,40 @@ async function runInstall(target: string): Promise<void> {
       testDebug(`install-deps failed (non-fatal): ${e}`);
     }
   }
+}
+
+/**
+ * Removes the `com.apple.quarantine` extended attribute from Playwright's
+ * browser cache directory. macOS sets this on anything downloaded from the
+ * network; on Tahoe and later it causes Gatekeeper to silently block launch.
+ *
+ * Best-effort: errors are logged but never thrown. If `xattr` doesn't exist,
+ * the cache dir is missing, or the attribute isn't present, we just move on.
+ */
+async function stripDarwinQuarantine(): Promise<void> {
+  const cacheDir = process.env.PLAYWRIGHT_BROWSERS_PATH
+    || path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright');
+
+  // PLAYWRIGHT_BROWSERS_PATH=0 means "install into node_modules" — skip,
+  // since those binaries weren't downloaded with quarantine in that flow.
+  if (cacheDir === '0')
+    return;
+
+  testDebug(`stripping quarantine attribute from ${cacheDir}`);
+  await new Promise<void>(resolve => {
+    const child = spawn('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', cacheDir], {
+      stdio: 'pipe',
+    });
+    child.on('close', code => {
+      if (code !== 0)
+        testDebug(`xattr exited ${code} (non-fatal)`);
+      resolve();
+    });
+    child.on('error', err => {
+      testDebug(`xattr spawn failed (non-fatal): ${err.message}`);
+      resolve();
+    });
+  });
 }
 
 function resolvePlaywrightCli(): string {
