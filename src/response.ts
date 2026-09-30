@@ -82,57 +82,28 @@ export class Response {
     return Math.ceil(text.length / 4);
   }
 
-  private truncateSnapshot(snapshot: string, maxTokens: number): string {
+  private omitLargeSnapshotBody(snapshot: string, maxTokens: number): string {
     const estimatedTokens = this.estimateTokenCount(snapshot);
 
     if (maxTokens <= 0 || estimatedTokens <= maxTokens)
       return snapshot;
 
+    const notice =
+      `**⚠️ Snapshot omitted: ~${estimatedTokens.toLocaleString()} tokens exceeds limit of ${maxTokens.toLocaleString()}**\n\n` +
+      `The accessibility tree was skipped to protect the context window. The header above still shows the page URL, title, console output, and downloads.\n\n` +
+      `**To get the full snapshot:**\n` +
+      `- Call \`browser_snapshot\` (always returns full page regardless of limit)\n` +
+      `- Or raise the limit: \`browser_configure_snapshots {"maxSnapshotTokens": ${Math.ceil(estimatedTokens * 1.2)}}\`\n` +
+      `- Or enable differential mode for delta-only updates: \`browser_configure_snapshots {"differentialSnapshots": true}\`\n`;
 
-    // Calculate how much text to keep (leave room for truncation message)
-    const truncationMessageTokens = 200; // Reserve space for helpful message
-    const keepTokens = Math.max(100, maxTokens - truncationMessageTokens);
-    const keepChars = keepTokens * 4;
+    // Preserve the header (console, downloads, Page URL, Page Title) but drop
+    // the YAML a11y tree, which is the bulk. Truncating the tree mid-node
+    // yields invalid YAML and orphan ref numbers that break browser_click.
+    const yamlStart = snapshot.indexOf('```yaml');
+    if (yamlStart === -1)
+      return notice;
 
-    const lines = snapshot.split('\n');
-    let truncatedSnapshot = '';
-    let currentLength = 0;
-
-    // Extract essential info first (URL, title, errors)
-    const essentialLines: string[] = [];
-    const contentLines: string[] = [];
-
-    for (const line of lines) {
-      if (line.includes('Page URL:') || line.includes('Page Title:') ||
-          line.includes('### Page state') || line.includes('error') || line.includes('Error'))
-        essentialLines.push(line);
-      else
-        contentLines.push(line);
-
-    }
-
-    // Always include essential info
-    for (const line of essentialLines) {
-      if (currentLength + line.length < keepChars) {
-        truncatedSnapshot += line + '\n';
-        currentLength += line.length + 1;
-      }
-    }
-
-    // Add as much content as possible
-    for (const line of contentLines) {
-      if (currentLength + line.length < keepChars) {
-        truncatedSnapshot += line + '\n';
-        currentLength += line.length + 1;
-      } else {
-        break;
-      }
-    }
-
-    // Add truncation message with helpful suggestions
-    const truncationMessage = `\n**⚠️ Snapshot truncated: showing ${this.estimateTokenCount(truncatedSnapshot).toLocaleString()} of ${estimatedTokens.toLocaleString()} tokens**\n\n**Options to see full snapshot:**\n- Use \`browser_snapshot\` tool for complete page snapshot\n- Increase limit: \`--max-snapshot-tokens ${Math.ceil(estimatedTokens * 1.2)}\`\n- Enable differential mode: \`--differential-snapshots\`\n- Disable auto-snapshots: \`--no-snapshots\`\n`;
-
-    return truncatedSnapshot + truncationMessage;
+    return snapshot.substring(0, yamlStart) + notice;
   }
 
   async snapshot(): Promise<string> {
@@ -149,9 +120,10 @@ export class Response {
         rawSnapshot = await this._context.currentTabOrDie().captureSnapshot();
 
 
-      // Apply truncation if maxSnapshotTokens is configured (but not for differential snapshots which are already small)
+      // Omit the a11y tree if the snapshot exceeds maxSnapshotTokens (skipped
+      // for differential snapshots, which are already small by construction).
       if (this._config.maxSnapshotTokens > 0 && !this._config.differentialSnapshots)
-        this._snapshot = this.truncateSnapshot(rawSnapshot, this._config.maxSnapshotTokens);
+        this._snapshot = this.omitLargeSnapshotBody(rawSnapshot, this._config.maxSnapshotTokens);
       else
         this._snapshot = rawSnapshot;
 
