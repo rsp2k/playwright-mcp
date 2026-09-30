@@ -333,6 +333,37 @@ export default [
           }
         }
 
+        // Track browser launch arg additions. updateBrowserConfig merges
+        // and dedupes, so a "change" is any supplied arg not already present.
+        if (params.args && params.args.length > 0) {
+          const existing = new Set(currentConfig.browser.launchOptions.args || []);
+          const newArgs = params.args.filter(a => !existing.has(a));
+          if (newArgs.length > 0)
+            changes.push(`args: +${newArgs.join(' ')}`);
+
+        }
+
+        if (params.chromiumSandbox !== undefined) {
+          const current = currentConfig.browser.launchOptions.chromiumSandbox;
+          if (params.chromiumSandbox !== current)
+            changes.push(`chromiumSandbox: ${current} → ${params.chromiumSandbox}`);
+
+        }
+
+        if (params.slowMo !== undefined) {
+          const current = currentConfig.browser.launchOptions.slowMo;
+          if (params.slowMo !== current)
+            changes.push(`slowMo: ${current ?? 0}ms → ${params.slowMo}ms`);
+
+        }
+
+        if (params.devtools !== undefined) {
+          const current = currentConfig.browser.launchOptions.devtools;
+          if (params.devtools !== current)
+            changes.push(`devtools: ${current} → ${params.devtools}`);
+
+        }
+
 
         if (changes.length === 0) {
           response.addResult('No configuration changes detected. Current settings remain the same.');
@@ -353,6 +384,10 @@ export default [
           offline: params.offline,
           proxyServer: params.proxyServer,
           proxyBypass: params.proxyBypass,
+          args: params.args,
+          chromiumSandbox: params.chromiumSandbox,
+          slowMo: params.slowMo,
+          devtools: params.devtools,
         });
 
         response.addResult(`Browser configuration updated successfully:\n${changes.map(c => `• ${c}`).join('\n')}\n\nThe browser has been restarted with the new settings.`);
