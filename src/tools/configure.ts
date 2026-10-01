@@ -729,9 +729,12 @@ export default [
       try {
         const changes: string[] = [];
 
-        // Update snapshot configuration
+        // Update snapshot configuration. Name the field in the echo so a client
+        // can grep their log for the parameter they actually passed — "Auto-snapshots"
+        // alone was ambiguous and cost a peer four diagnostic calls when the flag
+        // appeared to apply but silently didn't propagate.
         if (params.includeSnapshots !== undefined)
-          changes.push(`📸 Auto-snapshots: ${params.includeSnapshots ? 'enabled' : 'disabled'}`);
+          changes.push(`📸 Auto-snapshots (includeSnapshots): ${params.includeSnapshots ? 'enabled' : 'disabled'}`);
 
 
         if (params.maxSnapshotTokens !== undefined) {
@@ -850,7 +853,7 @@ export default [
         // Provide user feedback
         if (changes.length === 0) {
           const currentSettings = [
-            `📸 Auto-snapshots: ${context.config.includeSnapshots ? 'enabled' : 'disabled'}`,
+            `📸 Auto-snapshots (includeSnapshots): ${context.config.includeSnapshots ? 'enabled' : 'disabled'}`,
             `📏 Max snapshot tokens: ${context.config.maxSnapshotTokens === 0 ? 'unlimited' : context.config.maxSnapshotTokens.toLocaleString()}`,
             `🔄 Differential snapshots: ${context.config.differentialSnapshots ? 'enabled' : 'disabled'}`,
             `🧠 Differential mode: ${context.config.differentialMode || 'semantic'}`,
