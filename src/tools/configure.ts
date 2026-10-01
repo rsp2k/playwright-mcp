@@ -14,12 +14,31 @@
  * limitations under the License.
  */
 
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { z } from 'zod';
 import { devices } from 'playwright';
 import { defineTool } from './tool.js';
 import { ArtifactManagerRegistry } from '../artifactManager.js';
+import { packageJSON } from '../package.js';
 import type { Context } from '../context.js';
 import type { Response } from '../response.js';
+
+// Build fingerprint captured once at module load. mtime of this compiled
+// file nails "which build is running" without needing a build step to inject
+// a git SHA. A peer burned a round of diagnostics today unable to tell
+// whether their running MCP had a pushed fix in it; surfacing this in
+// browser_status settles that question with one cheap tool call.
+const BUILD_FINGERPRINT = (() => {
+  try {
+    const compiledPath = fileURLToPath(import.meta.url);
+    const mtime = fs.statSync(compiledPath).mtime.toISOString();
+    return { compiledPath, mtime };
+  } catch {
+    return { compiledPath: 'unknown', mtime: 'unknown' };
+  }
+})();
 
 const configureSchema = z.object({
   headless: z.boolean().optional().describe('Whether to run the browser in headless mode'),
@@ -991,6 +1010,11 @@ export default [
       // Build status report
       const lines: string[] = [
         '## 🌐 Browser Status',
+        '',
+        '### Build',
+        `- **Package version:** ${packageJSON.version}`,
+        `- **Compiled:** ${BUILD_FINGERPRINT.mtime}`,
+        `- **Running from:** \`${BUILD_FINGERPRINT.compiledPath}\``,
         '',
         '### Mode',
         `**${mode.toUpperCase()}**`,
