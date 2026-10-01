@@ -664,8 +664,13 @@ export class Context {
       currentConfig.browser.launchOptions.args = newArgs;
     }
 
-    // Store the modified config
-    (this as any).config = currentConfig;
+    // Store the modified config IN PLACE. Reassigning this.config to a new
+    // object breaks the shared-reference invariant that lets updateSnapshotConfig
+    // mutations propagate to browserServerBackend._config (which Response reads).
+    // Burned: a prior browser_configure would silently orphan every subsequent
+    // browser_configure_snapshots call — the Context saw the mutation but Response
+    // kept reading the original object, so includeSnapshots:false was inert.
+    Object.assign(this.config, currentConfig);
 
     // Close the current browser context to force recreation with new settings
     await this.closeBrowserContext();
