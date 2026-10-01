@@ -16,106 +16,107 @@
 
 import { test, expect } from './fixtures.js';
 
-// Regression tests for the identity-drift bug fixed in 7dafb6b.
+// Regression tests for the config identity-drift bug fixed in 7dafb6b.
 //
-// browser_configure's updateBrowserConfig previously did
+// Shape of the bug: browser_configure's updateBrowserConfig did
 //   (this as any).config = currentConfig
-// which REASSIGNED Context.config to a clone, orphaning backend._config
-// (which Response reads at construction). Subsequent updateSnapshotConfig
-// calls mutated the Context's clone while Response kept reading the
-// orphan. includeSnapshots:false (or :true) became silently inert.
+// which REASSIGNED Context.config to a clone. After that call,
+// backend._config (which Response reads at construction) kept pointing
+// at the ORIGINAL config object, while updateSnapshotConfig mutated the
+// clone. Flag changes landed on the clone and Response never saw them.
 //
-// A naive test calling browser_configure_snapshots FIRST passes on the
-// broken build because the reassignment hasn't happened yet. These tests
-// put browser_configure UPSTREAM of every includeSnapshots change, which
-// is the shape that exercises the drift.
+// A naive test with a browser_configure_snapshots call as its first act
+// passes on the broken build — the reassignment hasn't happened yet.
+//
+// The matrix below is 2x2: trigger-present × direction-asked. Each test
+// is a single cell. The failure signature across cells diagnoses the
+// shape of a regression rather than just raising an alarm:
+//
+//   drift reintroduced     → both WITH_TRIGGER cells fail, baselines pass
+//   suppression stuck on   → both ASKED_TRUE cells fail
+//   suppression stuck off  → both ASKED_FALSE cells fail
+//   flag read ignored      → one of each direction fails
+//
+// The baseline cells (no trigger) are not redundant: they catch
+// "suppression never works" and "snapshots never come back", which
+// the with-trigger cells can't distinguish from drift.
 
-test('browser_configure_snapshots suppresses snapshot after browser_configure', async ({ client, server }) => {
-  server.setContent('/', '<title>Hi</title><body>Hello</body>', 'text/html');
+const PAGE = '<title>Hi</title><body>Hello</body>';
 
-  // Step 1: browser_configure triggers the config reassignment on the
-  // broken build. Must come before any includeSnapshots change.
+test('includeSnapshots:false suppresses snapshot (no trigger)', async ({ client, server }) => {
+  server.setContent('/', PAGE, 'text/html');
+  await client.callTool({
+    name: 'browser_configure_snapshots',
+    arguments: { includeSnapshots: false },
+  });
+  const result = await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+  expect(result).not.toContainTextContent('Page Snapshot');
+});
+
+test('includeSnapshots:true restores snapshot (no trigger)', async ({ client, server }) => {
+  server.setContent('/', PAGE, 'text/html');
+  // Flip off first so we're asking for a change rather than the default.
+  await client.callTool({
+    name: 'browser_configure_snapshots',
+    arguments: { includeSnapshots: false },
+  });
+  await client.callTool({
+    name: 'browser_configure_snapshots',
+    arguments: { includeSnapshots: true },
+  });
+  const result = await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+  expect(result).toContainTextContent('Page Snapshot');
+});
+
+test('includeSnapshots:false suppresses snapshot after browser_configure trigger', async ({ client, server }) => {
+  server.setContent('/', PAGE, 'text/html');
+  // The trigger — on the broken build this reassigns Context.config to a
+  // clone that drifts from backend._config, and the next flag change is lost.
   await client.callTool({
     name: 'browser_configure',
     arguments: { viewport: { width: 1440, height: 900 } },
   });
-
-  // Step 2: Ask for snapshots off. On broken build this landed on the
-  // Context clone while Response kept reading the orphaned original.
   await client.callTool({
     name: 'browser_configure_snapshots',
     arguments: { includeSnapshots: false },
   });
-
-  // Step 3: Navigate — snapshot MUST NOT appear.
-  const navResult = await client.callTool({
+  const result = await client.callTool({
     name: 'browser_navigate',
     arguments: { url: server.PREFIX },
   });
-  expect(navResult).not.toContainTextContent('Page Snapshot');
+  expect(result).not.toContainTextContent('Page Snapshot');
 });
 
-test('browser_configure_snapshots restores snapshot in the OTHER direction', async ({ client, server }) => {
-  // The mirror case. If the test above were the only one, a hypothetical
-  // bug that "forces snapshots off whenever browser_configure runs" would
-  // pass it. This case freezes the config at :false first, then uses the
-  // trigger, then asks for :true — the broken build keeps it suppressed.
-  server.setContent('/', '<title>Hi</title><body>Hello</body>', 'text/html');
-
+test('includeSnapshots:true restores snapshot after browser_configure trigger', async ({ client, server }) => {
+  server.setContent('/', PAGE, 'text/html');
+  // Flip off first so we're asking true for a change, not the default.
   await client.callTool({
     name: 'browser_configure_snapshots',
     arguments: { includeSnapshots: false },
   });
-
-  // The trigger — reassignment happens here on the broken build.
+  // Trigger between the two flag changes — the mirror of the case above.
   await client.callTool({
     name: 'browser_configure',
     arguments: { viewport: { width: 1441, height: 900 } },
   });
-
-  // Ask for snapshots back on.
   await client.callTool({
     name: 'browser_configure_snapshots',
     arguments: { includeSnapshots: true },
   });
-
-  const navResult = await client.callTool({
+  const result = await client.callTool({
     name: 'browser_navigate',
     arguments: { url: server.PREFIX },
   });
-  // On broken build, the config object Response reads was frozen at
-  // :false by the pre-trigger step. The :true request landed on the
-  // Context clone and never reached Response. Snapshot would stay gone.
-  expect(navResult).toContainTextContent('Page Snapshot');
-});
-
-test('browser_configure_snapshots works WITHOUT the trigger (baseline, must not stand alone)', async ({ client, server }) => {
-  // Round 2 from the peer repro: a server with no browser_configure call
-  // never trips the reassignment, so the flag works both ways on the
-  // broken build too. This test is deliberately kept to document that
-  // the trigger IS the discriminator — if this one passes but the two
-  // above fail, the bug is the one 7dafb6b fixed.
-  server.setContent('/', '<title>Hi</title><body>Hello</body>', 'text/html');
-
-  await client.callTool({
-    name: 'browser_configure_snapshots',
-    arguments: { includeSnapshots: false },
-  });
-
-  const navOff = await client.callTool({
-    name: 'browser_navigate',
-    arguments: { url: server.PREFIX },
-  });
-  expect(navOff).not.toContainTextContent('Page Snapshot');
-
-  await client.callTool({
-    name: 'browser_configure_snapshots',
-    arguments: { includeSnapshots: true },
-  });
-
-  const navOn = await client.callTool({
-    name: 'browser_navigate',
-    arguments: { url: server.PREFIX },
-  });
-  expect(navOn).toContainTextContent('Page Snapshot');
+  // On broken build this one fails — the :true request lands on the
+  // Context clone while Response keeps reading the orphaned original
+  // where :false was last written. "Snapshot stays gone" was the
+  // original diagnostic trap: no snapshot block looks identical to
+  // "the flag is working beautifully".
+  expect(result).toContainTextContent('Page Snapshot');
 });
