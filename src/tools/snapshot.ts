@@ -51,7 +51,7 @@ const click = defineTabTool({
   schema: {
     name: 'browser_click',
     title: 'Click',
-    description: 'Perform click on a web page. Returns page snapshot after click (configurable via browser_configure_snapshots). Use browser_snapshot for explicit full snapshots.',
+    description: 'Perform click on a web page. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly. Use browser_snapshot for explicit full snapshots.',
     inputSchema: clickSchema,
     type: 'destructive',
   },
@@ -85,7 +85,7 @@ const drag = defineTabTool({
   schema: {
     name: 'browser_drag',
     title: 'Drag mouse',
-    description: 'Perform drag and drop between two elements. Returns page snapshot after drag (configurable via browser_configure_snapshots).',
+    description: 'Perform drag and drop between two elements. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.',
     inputSchema: z.object({
       startElement: z.string().describe('Human-readable source element description used to obtain the permission to interact with the element'),
       startRef: z.string().describe('Exact source element reference from the page snapshot'),
@@ -116,7 +116,7 @@ const hover = defineTabTool({
   schema: {
     name: 'browser_hover',
     title: 'Hover mouse',
-    description: 'Hover over element on page. Returns page snapshot after hover (configurable via browser_configure_snapshots).',
+    description: 'Hover over element on page. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.',
     inputSchema: elementSchema,
     type: 'readOnly',
   },
@@ -142,7 +142,7 @@ const selectOption = defineTabTool({
   schema: {
     name: 'browser_select_option',
     title: 'Select option',
-    description: 'Select an option in a dropdown. Returns page snapshot after selection (configurable via browser_configure_snapshots).',
+    description: 'Select an option in a dropdown. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.',
     inputSchema: selectOptionSchema,
     type: 'destructive',
   },

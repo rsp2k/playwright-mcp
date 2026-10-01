@@ -75,6 +75,13 @@ export const test = baseTest.extend<TestFixtures & TestOptions, WorkerFixtures>(
         args.push('--headless');
       if (mcpBrowser)
         args.push(`--browser=${mcpBrowser}`);
+      // The production default is includeSnapshots:false (opt-in), but the
+      // test harness represents the snapshot-aware-client case: existing
+      // tests assert against snapshot content after navigate/click/etc. and
+      // the suite is where we exercise that path. Individual tests that
+      // need the production default can override by not relying on auto
+      // snapshots (configure-snapshots.spec.ts does its own thing).
+      args.push('--include-snapshots');
       if (options?.args)
         args.push(...options.args);
       if (options?.config) {

@@ -48,7 +48,7 @@ program
     .option('--no-isolated', 'use a persistent browser profile. Enables features like Push API that require non-incognito mode.')
     .option('--grant-all-permissions', 'grant all browser permissions (geolocation, camera, microphone, clipboard, etc.) at startup.')
     .option('--image-responses <mode>', 'whether to send image responses to the client. Can be "allow" or "omit", Defaults to "allow".')
-    .option('--no-snapshots', 'disable automatic page snapshots after interactive operations like clicks. Use browser_snapshot tool for explicit snapshots.')
+    .option('--include-snapshots', 'attach an accessibility snapshot after every interactive operation. Default off — call browser_snapshot explicitly when you need one, or opt in per-session via browser_configure_snapshots.')
     .option('--max-snapshot-tokens <tokens>', 'maximum number of tokens allowed in page snapshots before truncation. Use 0 to disable truncation. Default is 10000.', parseInt)
     .option('--differential-snapshots', 'enable differential snapshots that only show changes since the last snapshot instead of full page snapshots.')
     .option('--no-sandbox', 'disable the sandbox for all process types that are normally sandboxed.')
@@ -72,9 +72,10 @@ program
         console.error('The --vision option is deprecated, use --caps=vision instead');
         options.caps = 'vision';
       }
-      // Handle negated boolean options
-      if (options.noSnapshots !== undefined)
-        options.includeSnapshots = !options.noSnapshots;
+      // --include-snapshots populates options.includeSnapshots directly;
+      // no translation needed. (The previous --no-snapshots flag read
+      // options.noSnapshots which commander never actually populates — dead
+      // code since inception; passing --no-snapshots did nothing.)
 
       const config = await resolveCLIConfig(options);
       const abortController = setupExitWatchdog(config.server);

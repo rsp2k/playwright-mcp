@@ -188,9 +188,11 @@ Playwright MCP server supports following arguments. They can be provided in the 
                                   startup.
   --image-responses <mode>        whether to send image responses to the client.
                                   Can be "allow" or "omit", Defaults to "allow".
-  --no-snapshots                  disable automatic page snapshots after
-                                  interactive operations like clicks. Use
-                                  browser_snapshot tool for explicit snapshots.
+  --include-snapshots             attach an accessibility snapshot after every
+                                  interactive operation. Default off — call
+                                  browser_snapshot explicitly when you need one,
+                                  or opt in per-session via
+                                  browser_configure_snapshots.
   --max-snapshot-tokens <tokens>  maximum number of tokens allowed in page
                                   snapshots before truncation. Use 0 to disable
                                   truncation. Default is 10000.
@@ -683,7 +685,7 @@ http.createServer(async (req, res) => {
 
 - **browser_click**
   - Title: Click
-  - Description: Perform click on a web page. Returns page snapshot after click (configurable via browser_configure_snapshots). Use browser_snapshot for explicit full snapshots.
+  - Description: Perform click on a web page. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly. Use browser_snapshot for explicit full snapshots.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -834,7 +836,7 @@ Note: filterPreset and jqExpression are mutually exclusive. Preset takes precede
 
 - **browser_dismiss_all_file_choosers**
   - Title: Dismiss all file choosers
-  - Description: Dismiss/cancel all open file chooser dialogs without uploading files. Useful when multiple file choosers are stuck open. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).
+  - Description: Dismiss/cancel all open file chooser dialogs without uploading files. Useful when multiple file choosers are stuck open. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters: None
   - Read-only: **false**
 
@@ -842,7 +844,7 @@ Note: filterPreset and jqExpression are mutually exclusive. Preset takes precede
 
 - **browser_dismiss_file_chooser**
   - Title: Dismiss file chooser
-  - Description: Dismiss/cancel a file chooser dialog without uploading files. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).
+  - Description: Dismiss/cancel a file chooser dialog without uploading files. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters: None
   - Read-only: **false**
 
@@ -850,7 +852,7 @@ Note: filterPreset and jqExpression are mutually exclusive. Preset takes precede
 
 - **browser_drag**
   - Title: Drag mouse
-  - Description: Perform drag and drop between two elements. Returns page snapshot after drag (configurable via browser_configure_snapshots).
+  - Description: Perform drag and drop between two elements. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `startElement` (string): Human-readable source element description used to obtain the permission to interact with the element
     - `startRef` (string): Exact source element reference from the page snapshot
@@ -907,7 +909,7 @@ This is the FIRST conversational browser automation MCP server!
 
 - **browser_evaluate**
   - Title: Evaluate JavaScript
-  - Description: Evaluate JavaScript expression on page or element. Returns page snapshot after evaluation (configurable via browser_configure_snapshots).
+  - Description: Evaluate JavaScript expression on page or element. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `function` (string): () => { /* code */ } or (element) => { /* code */ } when element is provided
     - `element` (string, optional): Human-readable element description used to obtain permission to interact with the element
@@ -930,7 +932,7 @@ This is the FIRST conversational browser automation MCP server!
 
 - **browser_file_upload**
   - Title: Upload files
-  - Description: Upload one or multiple files. Returns page snapshot after upload (configurable via browser_configure_snapshots).
+  - Description: Upload one or multiple files. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `paths` (array): The absolute paths to the files to upload. Can be a single file or multiple files.
   - Read-only: **false**
@@ -1046,7 +1048,7 @@ This is the FIRST conversational browser automation MCP server!
 
 - **browser_handle_dialog**
   - Title: Handle a dialog
-  - Description: Handle a dialog. Returns page snapshot after handling dialog (configurable via browser_configure_snapshots).
+  - Description: Handle a dialog. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `accept` (boolean): Whether to accept the dialog.
     - `promptText` (string, optional): The text of the prompt in case of a prompt dialog.
@@ -1067,7 +1069,7 @@ This is the FIRST conversational browser automation MCP server!
 
 - **browser_hover**
   - Title: Hover mouse
-  - Description: Hover over element on page. Returns page snapshot after hover (configurable via browser_configure_snapshots).
+  - Description: Hover over element on page. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -1208,7 +1210,7 @@ Full API: See MODEL-COLLABORATION-API.md
 
 - **browser_navigate**
   - Title: Navigate to a URL
-  - Description: Navigate to a URL. Returns page snapshot after navigation (configurable via browser_configure_snapshots).
+  - Description: Navigate to a URL. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `url` (string): The URL to navigate to
   - Read-only: **false**
@@ -1250,7 +1252,7 @@ Full API: See MODEL-COLLABORATION-API.md
 
 - **browser_press_key**
   - Title: Press a key
-  - Description: Press a key on the keyboard. Returns page snapshot after keypress (configurable via browser_configure_snapshots).
+  - Description: Press a key on the keyboard. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `key` (string): Name of the key to press or a character to generate, such as `ArrowLeft` or `a`
   - Read-only: **false**
@@ -1296,10 +1298,10 @@ Full API: See MODEL-COLLABORATION-API.md
 
 - **browser_resize**
   - Title: Resize browser window
-  - Description: Resize the browser window
+  - Description: Resize the browser viewport to the specified width and height in pixels. Common sizes: 1920x1080 (Full HD), 1440x900 (laptop), 1280x720 (HD), 390x844 (mobile).
   - Parameters:
-    - `width` (number): Width of the browser window
-    - `height` (number): Height of the browser window
+    - `width` (number): Viewport width in pixels
+    - `height` (number): Viewport height in pixels
   - Read-only: **true**
 
 <!-- NOTE: This has been generated via update-readme.js -->
@@ -1322,7 +1324,7 @@ Full API: See MODEL-COLLABORATION-API.md
 
 - **browser_select_option**
   - Title: Select option
-  - Description: Select an option in a dropdown. Returns page snapshot after selection (configurable via browser_configure_snapshots).
+  - Description: Select an option in a dropdown. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -1552,7 +1554,7 @@ Full API: See MODEL-COLLABORATION-API.md
 
 - **browser_type**
   - Title: Type text
-  - Description: Type text into editable element. Returns page snapshot after typing (configurable via browser_configure_snapshots).
+  - Description: Type text into editable element. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `element` (string): Human-readable element description used to obtain permission to interact with the element
     - `ref` (string): Exact target element reference from the page snapshot
@@ -1603,7 +1605,7 @@ Full API: See MODEL-COLLABORATION-API.md
 
 - **browser_tab_close**
   - Title: Close a tab
-  - Description: Close a tab. Returns page snapshot after closing tab (configurable via browser_configure_snapshots).
+  - Description: Close a tab. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `index` (number, optional): The index of the tab to close. Closes current tab if not provided.
   - Read-only: **false**
@@ -1620,7 +1622,7 @@ Full API: See MODEL-COLLABORATION-API.md
 
 - **browser_tab_new**
   - Title: Open a new tab
-  - Description: Open a new tab. Returns page snapshot after opening tab (configurable via browser_configure_snapshots).
+  - Description: Open a new tab. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `url` (string, optional): The URL to navigate to in the new tab. If not provided, the new tab will be blank.
   - Read-only: **true**
@@ -1629,7 +1631,7 @@ Full API: See MODEL-COLLABORATION-API.md
 
 - **browser_tab_select**
   - Title: Select a tab
-  - Description: Select a tab by index. Returns page snapshot after selecting tab (configurable via browser_configure_snapshots).
+  - Description: Select a tab by index. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.
   - Parameters:
     - `index` (number): The index of the tab to select
   - Read-only: **true**

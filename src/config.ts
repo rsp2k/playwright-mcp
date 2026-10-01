@@ -77,7 +77,10 @@ const defaultConfig: FullConfig = {
   },
   server: {},
   outputDir: path.join(os.tmpdir(), 'playwright-mcp-output', sanitizeForFilePath(new Date().toISOString())),
-  includeSnapshots: true,
+  // Default off: accessibility trees are expensive (~15k tokens on rich pages)
+  // and pile up across a session. Opt in via browser_configure_snapshots
+  // {includeSnapshots: true}, or call browser_snapshot explicitly when needed.
+  includeSnapshots: false,
   maxSnapshotTokens: 10000,
   differentialSnapshots: false,
   differentialMode: 'semantic' as const,

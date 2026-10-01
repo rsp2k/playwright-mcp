@@ -23,7 +23,7 @@ const uploadFile = defineTabTool({
   schema: {
     name: 'browser_file_upload',
     title: 'Upload files',
-    description: 'Upload one or multiple files. Returns page snapshot after upload (configurable via browser_configure_snapshots).',
+    description: 'Upload one or multiple files. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.',
     inputSchema: z.object({
       paths: z.array(z.string()).describe('The absolute paths to the files to upload. Can be a single file or multiple files.'),
     }),
@@ -54,7 +54,7 @@ const dismissFileChooser = defineTabTool({
   schema: {
     name: 'browser_dismiss_file_chooser',
     title: 'Dismiss file chooser',
-    description: 'Dismiss/cancel a file chooser dialog without uploading files. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).',
+    description: 'Dismiss/cancel a file chooser dialog without uploading files. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.',
     inputSchema: z.object({
       // No parameters needed - just dismiss the dialog
     }),
@@ -84,7 +84,7 @@ const dismissAllFileChoosers = defineTabTool({
   schema: {
     name: 'browser_dismiss_all_file_choosers',
     title: 'Dismiss all file choosers',
-    description: 'Dismiss/cancel all open file chooser dialogs without uploading files. Useful when multiple file choosers are stuck open. Returns page snapshot after dismissal (configurable via browser_configure_snapshots).',
+    description: 'Dismiss/cancel all open file chooser dialogs without uploading files. Useful when multiple file choosers are stuck open. Snapshots are opt-in since default changed to off; enable via browser_configure_snapshots {includeSnapshots:true}, or call browser_snapshot explicitly.',
     inputSchema: z.object({
       // No parameters needed
     }),
