@@ -450,9 +450,28 @@ export class Context {
     // Get environment-specific browser options
     const envOptions = this._environmentIntrospector.getRecommendedBrowserOptions();
 
+    // User's launchOptions MUST win over env-detected options. The old spread
+    // order (user first, env second) let envOptions.headless silently override
+    // the user's choice: environmentIntrospection forces headless=true whenever
+    // it can't find /tmp/.X11-unix among the MCP roots, which is always true
+    // under Claude Code (roots are project dirs, not system paths). Peer with
+    // video recording active saw browser_configure(headless:false) land in the
+    // config but every launch still spawned chromium-headless-shell, because
+    // this path (used whenever video is active) kept flipping it back.
+    //
+    // Keep env.DISPLAY and GPU args contributing — those are additive. Just
+    // don't let env-detected fields win where the user has stated a preference.
     const launchOptions = {
+      ...envOptions,
       ...this.config.browser.launchOptions,
-      ...envOptions, // Include environment-detected options
+      env: {
+        ...(envOptions.env || {}),
+        ...((this.config.browser.launchOptions as any).env || {}),
+      },
+      args: [
+        ...(envOptions.args || []),
+        ...(this.config.browser.launchOptions.args || []),
+      ],
       handleSIGINT: false,
       handleSIGTERM: false,
     };
