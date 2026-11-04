@@ -1,30 +1,94 @@
 services:
   playwright-mcp:
-    build: .
+    build:
+      context: .
+      target: builder
+    image: playwright-mcp:dev
     container_name: playwright-mcp
     restart: unless-stopped
+
+    # Keep stdin open so program.ts's HTTP-mode exit watchdog doesn't fire.
+    # It wires `process.stdin.on('close', handleExit)` whenever --port is
+    # set, intended to kill the server if a parent process disappears.
+    # In a container without stdin_open, stdin is EOF at startup and the
+    # watchdog kills the server immediately.
+    stdin_open: true
+
+    # Run as the host user so bind-mounted lib/ and node_modules stay
+    # readable, and so headed chromium can share the X11 socket cleanly.
+    user: "${UID:-1000}:${GID:-1000}"
+
     environment:
-      - NODE_ENV=production
-      - HEADLESS=${HEADLESS:-false}
-      - DISPLAY=${DISPLAY:-}
-    command: ["--port", "8931", "--host", "0.0.0.0", "--browser", "chromium", "--no-sandbox"]
-    entrypoint: ["node", "cli.js"]
-    ports:
-      - "8931:8931"
+      - DISPLAY=${DISPLAY:-:0}
+      # Xorg uses access control via per-session cookie. The container
+      # needs the cookie to actually open windows on the host display,
+      # even with the socket mounted. XAUTHORITY on this host points at
+      # a session-specific file in /tmp (not ~/.Xauthority, which is a
+      # directory under some login managers like SDDM).
+      - XAUTHORITY=/tmp/xauthority
+      # Point Playwright at the host's browser cache (bind-mounted below).
+      # This guarantees the exact browser version matches what the host's
+      # playwright-core expects — critical with alpha builds.
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright-host
+
+    entrypoint: ["node", "/app/cli.js"]
+    command:
+      - --port=8931
+      - --host=0.0.0.0
+      # Chromium's user-namespace sandbox doesn't work inside the
+      # container (AppArmor restrictions on unprivileged userns on most
+      # modern distros). Without this the browser dies at zygote init
+      # with "No usable sandbox" / SIGTRAP, and playwright-mcp swallows
+      # the launch error, returning an empty-success response. The
+      # upstream Dockerfile knows this and bakes --no-sandbox into its
+      # entrypoint; we drop its entrypoint for dev-mode flexibility, so
+      # we have to supply it here.
+      - --no-sandbox
+
     labels:
       caddy: ${DOMAIN}
       caddy.reverse_proxy: "{{upstreams 8931}}"
+
     networks:
       - caddy
+
     volumes:
-      - ./output:/tmp/playwright-mcp-output
+      # Dev-mode bind-mounts: host-side `npm run build` is reflected in
+      # the container on next restart (no image rebuild needed). Every
+      # session connected to this one HTTP server picks up the new code.
+      - ./lib:/app/lib:ro
+      - ./cli.js:/app/cli.js:ro
+      - ./package.json:/app/package.json:ro
+
+      # Browsers from host match the alpha playwright-core version exactly.
+      - ${HOME}/.cache/ms-playwright:/ms-playwright-host:ro
+
+      # X11 socket for headed browser rendering on the host display.
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
+
+      # X11 auth cookie, read from the host's XAUTHORITY env var.
+      # Without this the socket is reachable but Xorg refuses access.
+      - ${XAUTHORITY}:/tmp/xauthority:ro
+
+      # Session artifacts (traces, screenshots, downloads) stay on host.
+      - ./output:/tmp/playwright-mcp-output
+
     healthcheck:
-      test: ["CMD", "sh", "-c", "nc -z localhost 8931"]
+      # Any HTTP response from /mcp (even the 400 GET-returns) proves the
+      # listener is up. Connection refused or timeout = unhealthy.
+      test:
+        - CMD-SHELL
+        - node -e "require('http').get('http://127.0.0.1:8931/mcp',r=>process.exit(0)).on('error',_=>process.exit(1))"
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
-      start_period: 40s
+      start_period: 10s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   caddy:
