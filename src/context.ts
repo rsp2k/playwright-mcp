@@ -586,6 +586,12 @@ export class Context {
     slowMo?: number;
     devtools?: boolean;
     args?: string[];
+
+    // Network behavior overrides
+    hostMappings?: Array<{ hostname: string; target: string; port?: number }>;
+    hostExcludes?: string[];
+    ignoreHttpsErrors?: boolean;
+    disableWebSecurity?: boolean;
   }): Promise<void> {
     const currentConfig = { ...this.config };
 
@@ -681,6 +687,56 @@ export class Context {
       }
 
       currentConfig.browser.launchOptions.args = newArgs;
+    }
+
+    // Host resolver rules: Chromium takes --host-resolver-rules as a single
+    // atomic value; multiple occurrences collapse to the last. So we strip
+    // any prior --host-resolver-rules= entry and append one fresh value
+    // built from the current mappings + excludes. hostMappings and
+    // hostExcludes together form the complete rule; providing one without
+    // the other drops the other's prior value (pass both to preserve, or
+    // pass empty arrays to clear).
+    if (changes.hostMappings !== undefined || changes.hostExcludes !== undefined) {
+      const args = currentConfig.browser.launchOptions.args ?? [];
+      const filtered = args.filter(a => !a.startsWith('--host-resolver-rules='));
+      const mappings = changes.hostMappings ?? [];
+      const excludes = changes.hostExcludes ?? [];
+      if (mappings.length > 0 || excludes.length > 0) {
+        const parts: string[] = [];
+        for (const m of mappings) {
+          const tgt = m.port !== undefined ? `${m.target}:${m.port}` : m.target;
+          parts.push(`MAP ${m.hostname} ${tgt}`);
+        }
+        for (const h of excludes)
+          parts.push(`EXCLUDE ${h}`);
+        filtered.push(`--host-resolver-rules=${parts.join(', ')}`);
+      }
+      currentConfig.browser.launchOptions.args = filtered;
+    }
+
+    // HTTPS cert errors: route to Playwright's native context option rather
+    // than chromium's --ignore-certificate-errors arg. Native handling is
+    // scoped to the browser context (clean teardown), doesn't require a
+    // flag-string match to toggle off, and plays nicely with persistent
+    // profiles that don't love having the flag flip-flopped.
+    if (changes.ignoreHttpsErrors !== undefined)
+      currentConfig.browser.contextOptions.ignoreHTTPSErrors = changes.ignoreHttpsErrors;
+
+    // Web security disable: no Playwright native equivalent exists, so
+    // this stays as a chromium flag with sticky single-flag semantics.
+    // --disable-site-isolation-trials is required alongside --disable-web-security
+    // in modern Chromium; the latter alone is insufficient when site isolation
+    // is active. Note: may also require isolated/incognito mode and a non-default
+    // user-data-dir to actually take effect; chromium silently ignores
+    // --disable-web-security in some profile states.
+    if (changes.disableWebSecurity !== undefined) {
+      const args = currentConfig.browser.launchOptions.args ?? [];
+      const filtered = args.filter(a =>
+        a !== '--disable-web-security' && a !== '--disable-site-isolation-trials'
+      );
+      if (changes.disableWebSecurity)
+        filtered.push('--disable-web-security', '--disable-site-isolation-trials');
+      currentConfig.browser.launchOptions.args = filtered;
     }
 
     // Store the modified config IN PLACE. Reassigning this.config to a new

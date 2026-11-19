@@ -68,6 +68,18 @@ const configureSchema = z.object({
   slowMo: z.coerce.number().min(0).optional().describe('Slow down operations by specified milliseconds (helps with visual tracking)'),
   devtools: z.boolean().optional().describe('Open browser with DevTools panel open (Chromium only)'),
   args: z.array(z.string()).optional().describe('Additional browser launch arguments for UI customization (e.g., ["--force-color-profile=srgb", "--disable-features=VizDisplayCompositor"])'),
+
+  // Network behavior overrides. See also the named facade tools in
+  // network-config.ts (browser_set_host_mappings, browser_set_proxy, etc.)
+  // which forward here under the hood.
+  hostMappings: z.array(z.object({
+    hostname: z.string().describe('Hostname to override. Wildcards supported: "foo.example.com" or "*.internal.example"'),
+    target: z.string().describe('IP or hostname the browser should actually connect to'),
+    port: z.coerce.number().optional().describe('Destination port override (omit to keep the original URL\'s port)'),
+  })).optional().describe('Override DNS resolution for specific hostnames. The browser still sends the original hostname in the Host header and TLS SNI; the TCP connection goes to the mapped target. Use this when you need the effect of a custom Host header, since Chromium does not let the Host header be set directly via header-override APIs. hostMappings and hostExcludes together form one complete rule; providing one without the other drops the other\'s prior value. Pass [] to clear.'),
+  hostExcludes: z.array(z.string()).optional().describe('Hostnames to bypass host-mapping rules (e.g. ["localhost"]). Companion to hostMappings; see its note about preserving prior values.'),
+  ignoreHttpsErrors: z.boolean().optional().describe('Accept self-signed or otherwise invalid HTTPS certificates. Sets Playwright\'s native context.ignoreHTTPSErrors.'),
+  disableWebSecurity: z.boolean().optional().describe('Disable same-origin policy and related web-platform security checks (equivalent to chromium --disable-web-security + --disable-site-isolation-trials). May require isolated/incognito mode to take effect. Dangerous: only for controlled testing.'),
 });
 
 const listDevicesSchema = z.object({});
@@ -383,6 +395,29 @@ export default [
 
         }
 
+        // Network behavior tracking. Count is good enough for the change log;
+        // the full rendered rule shows up in logs/wmctrl at the chromium argv.
+        if (params.hostMappings !== undefined || params.hostExcludes !== undefined) {
+          const maps = params.hostMappings?.length ?? 0;
+          const excls = params.hostExcludes?.length ?? 0;
+          if (maps === 0 && excls === 0)
+            changes.push('host mappings: cleared');
+          else
+            changes.push(`host mappings: ${maps} MAP + ${excls} EXCLUDE`);
+        }
+
+        if (params.ignoreHttpsErrors !== undefined) {
+          const current = currentConfig.browser.contextOptions.ignoreHTTPSErrors ?? false;
+          if (params.ignoreHttpsErrors !== current)
+            changes.push(`ignoreHttpsErrors: ${current} → ${params.ignoreHttpsErrors}`);
+        }
+
+        if (params.disableWebSecurity !== undefined) {
+          const current = (currentConfig.browser.launchOptions.args ?? []).includes('--disable-web-security');
+          if (params.disableWebSecurity !== current)
+            changes.push(`disableWebSecurity: ${current} → ${params.disableWebSecurity}`);
+        }
+
 
         if (changes.length === 0) {
           response.addResult('No configuration changes detected. Current settings remain the same.');
@@ -407,6 +442,10 @@ export default [
           chromiumSandbox: params.chromiumSandbox,
           slowMo: params.slowMo,
           devtools: params.devtools,
+          hostMappings: params.hostMappings,
+          hostExcludes: params.hostExcludes,
+          ignoreHttpsErrors: params.ignoreHttpsErrors,
+          disableWebSecurity: params.disableWebSecurity,
         });
 
         response.addResult(`Browser configuration updated successfully:\n${changes.map(c => `• ${c}`).join('\n')}\n\nThe browser has been restarted with the new settings.`);
