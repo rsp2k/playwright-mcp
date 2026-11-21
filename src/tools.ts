@@ -37,6 +37,7 @@ import snapshot from './tools/snapshot.js';
 import storage from './tools/storage.js';
 import tabs from './tools/tabs.js';
 import screenshot from './tools/screenshot.js';
+import webmcp from './tools/webmcp.js';
 import themeManagement from './tools/themeManagement.js';
 import video from './tools/video.js';
 import wait from './tools/wait.js';
@@ -72,6 +73,7 @@ export const allTools: Tool<any>[] = [
   ...storage,
   ...tabs,
   ...themeManagement,
+  ...webmcp,
   ...video,
   ...wait,
   ...webrtc,

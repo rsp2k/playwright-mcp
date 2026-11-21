@@ -592,6 +592,10 @@ export class Context {
     hostExcludes?: string[];
     ignoreHttpsErrors?: boolean;
     disableWebSecurity?: boolean;
+
+    // Browser binary selection (pick a different chromium build at runtime)
+    executablePath?: string;
+    channel?: string;
   }): Promise<void> {
     const currentConfig = { ...this.config };
 
@@ -737,6 +741,27 @@ export class Context {
       if (changes.disableWebSecurity)
         filtered.push('--disable-web-security', '--disable-site-isolation-trials');
       currentConfig.browser.launchOptions.args = filtered;
+    }
+
+    // Browser binary selection. executablePath points at a specific chrome
+    // binary (useful for WebMCP work where the default Chromium 139 lacks
+    // modelContext, and a newer cache entry like
+    // /ms-playwright-host/chromium-1248/chrome-linux64/chrome gives you
+    // Chrome 156+). channel picks a system-installed variant like chrome-beta.
+    // Empty string clears the override. The two are not mutually exclusive
+    // from a type standpoint, but Playwright ignores channel when
+    // executablePath is set, so passing both just works.
+    if (changes.executablePath !== undefined) {
+      if (changes.executablePath === '')
+        delete currentConfig.browser.launchOptions.executablePath;
+      else
+        currentConfig.browser.launchOptions.executablePath = changes.executablePath;
+    }
+    if (changes.channel !== undefined) {
+      if (changes.channel === '')
+        delete currentConfig.browser.launchOptions.channel;
+      else
+        currentConfig.browser.launchOptions.channel = changes.channel;
     }
 
     // Store the modified config IN PLACE. Reassigning this.config to a new

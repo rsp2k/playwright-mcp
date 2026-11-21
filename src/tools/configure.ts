@@ -80,6 +80,11 @@ const configureSchema = z.object({
   hostExcludes: z.array(z.string()).optional().describe('Hostnames to bypass host-mapping rules (e.g. ["localhost"]). Companion to hostMappings; see its note about preserving prior values.'),
   ignoreHttpsErrors: z.boolean().optional().describe('Accept self-signed or otherwise invalid HTTPS certificates. Sets Playwright\'s native context.ignoreHTTPSErrors.'),
   disableWebSecurity: z.boolean().optional().describe('Disable same-origin policy and related web-platform security checks (equivalent to chromium --disable-web-security + --disable-site-isolation-trials). May require isolated/incognito mode to take effect. Dangerous: only for controlled testing.'),
+
+  // Browser binary selection — useful when you need a newer Chromium than
+  // playwright-core bundles (e.g. for WebMCP which needs Chrome 146+/153+).
+  executablePath: z.string().optional().describe('Path to a specific chromium/chrome binary. Overrides playwright-core\'s bundled download. Example: "/ms-playwright-host/chromium-1248/chrome-linux64/chrome" gives you Chrome 156 for WebMCP work. Empty string clears the override and falls back to the bundled browser.'),
+  channel: z.string().optional().describe('Browser channel to use: "chrome", "chrome-beta", "chrome-canary", "chrome-dev", "msedge", "msedge-beta", etc. Requires that channel to be installed system-wide. Playwright ignores this when executablePath is also set. Empty string clears the override.'),
 });
 
 const listDevicesSchema = z.object({});
@@ -418,6 +423,18 @@ export default [
             changes.push(`disableWebSecurity: ${current} → ${params.disableWebSecurity}`);
         }
 
+        if (params.executablePath !== undefined) {
+          const current = currentConfig.browser.launchOptions.executablePath ?? '(bundled)';
+          if (params.executablePath !== current)
+            changes.push(`executablePath: ${current} → ${params.executablePath || '(bundled)'}`);
+        }
+
+        if (params.channel !== undefined) {
+          const current = currentConfig.browser.launchOptions.channel ?? '(none)';
+          if (params.channel !== current)
+            changes.push(`channel: ${current} → ${params.channel || '(none)'}`);
+        }
+
 
         if (changes.length === 0) {
           response.addResult('No configuration changes detected. Current settings remain the same.');
@@ -446,6 +463,8 @@ export default [
           hostExcludes: params.hostExcludes,
           ignoreHttpsErrors: params.ignoreHttpsErrors,
           disableWebSecurity: params.disableWebSecurity,
+          executablePath: params.executablePath,
+          channel: params.channel,
         });
 
         response.addResult(`Browser configuration updated successfully:\n${changes.map(c => `• ${c}`).join('\n')}\n\nThe browser has been restarted with the new settings.`);
@@ -1120,6 +1139,49 @@ export default [
         `| Service Workers | ${isIsolated ? '⚠️ Ephemeral' : '✅ Persistent'} |`,
         `| Browser Storage | ${isIsolated ? '⚠️ Ephemeral' : '✅ Persistent'} |`,
       );
+
+      // WebMCP capability probe. Chromium silently ignores unknown
+      // --enable-features names, so just "I passed the flag" proves nothing.
+      // Only a page-side check for document.modelContext tells the truth.
+      // Skipped if no tab is open yet (can't eval without a page).
+      const currentTab = context.currentTab();
+      if (currentTab) {
+        try {
+          const webmcp = await currentTab.page.evaluate(async () => {
+            const ua = navigator.userAgent;
+            const m = ua.match(/Chrome\/([\d.]+)/);
+            const chromeVersion = m ? m[1] : null;
+            const chromeMajor = chromeVersion ? parseInt(chromeVersion.split('.')[0], 10) : null;
+            const doc = document as any;
+            const hasGetTools = typeof doc.modelContext?.getTools === 'function';
+            // getTools() returns a Promise per the WebMCP spec; await it.
+            const tools = hasGetTools ? (await doc.modelContext.getTools()) : null;
+            return {
+              chromeVersion,
+              chromeMajor,
+              modelContextPresent: 'modelContext' in document,
+              hasGetTools,
+              toolCount: tools ? tools.length : 0,
+            };
+          });
+          lines.push(
+            '',
+            '### WebMCP',
+            `- **Chrome version:** ${webmcp.chromeVersion ?? 'unknown'}`,
+            `- **\`document.modelContext\`:** ${webmcp.modelContextPresent ? '✅ present' : '❌ absent'}`,
+            `- **Tools registered by current page:** ${webmcp.toolCount}`,
+          );
+          if (!webmcp.modelContextPresent) {
+            if (webmcp.chromeMajor && webmcp.chromeMajor < 146) {
+              lines.push(`- ⚠️ Chrome ${webmcp.chromeMajor} predates WebMCP (needs 146+, ideally 153+). Use \`browser_configure\` with \`executablePath\` pointing at a newer chromium, e.g. \`/ms-playwright-host/chromium-1248/chrome-linux64/chrome\` (Chrome 156).`);
+            } else if (webmcp.chromeMajor && webmcp.chromeMajor >= 146) {
+              lines.push(`- ⚠️ Chrome version supports WebMCP but feature not enabled. Pass \`--enable-features=WebMCP\` via \`browser_configure\` args (Chromium silently ignores unknown feature names, so passing the flag alone is not proof).`);
+            }
+          }
+        } catch {
+          // No active page or evaluation failed — skip the WebMCP section rather than break browser_status.
+        }
+      }
 
       response.addResult(lines.join('\n'));
     },
