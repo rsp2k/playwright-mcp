@@ -1156,12 +1156,23 @@ export default [
             const hasGetTools = typeof doc.modelContext?.getTools === 'function';
             // getTools() returns a Promise per the WebMCP spec; await it.
             const tools = hasGetTools ? (await doc.modelContext.getTools()) : null;
+            // Secure-context detection. Chromium exposes document.modelContext
+            // only on secure contexts; localhost (and 127.0.0.1, [::1]) are
+            // always secure, but any other http origin is not — so modelContext
+            // is withheld on http://host.docker.internal:4470 even when WebMCP
+            // is enabled. Second trap after the Chrome version.
+            const origin = location.origin;
+            const isHttp = location.protocol === 'http:';
+            const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '[::1]';
+            const insecureHttpOrigin = isHttp && !isLocalhost;
             return {
               chromeVersion,
               chromeMajor,
               modelContextPresent: 'modelContext' in document,
               hasGetTools,
               toolCount: tools ? tools.length : 0,
+              origin,
+              insecureHttpOrigin,
             };
           });
           lines.push(
@@ -1175,7 +1186,11 @@ export default [
             if (webmcp.chromeMajor && webmcp.chromeMajor < 146) {
               lines.push(`- ⚠️ Chrome ${webmcp.chromeMajor} predates WebMCP (needs 146+, ideally 153+). Use \`browser_configure\` with \`executablePath\` pointing at a newer chromium, e.g. \`/ms-playwright-host/chromium-1248/chrome-linux64/chrome\` (Chrome 156).`);
             } else if (webmcp.chromeMajor && webmcp.chromeMajor >= 146) {
-              lines.push(`- ⚠️ Chrome version supports WebMCP but feature not enabled. Pass \`--enable-features=WebMCP\` via \`browser_configure\` args (Chromium silently ignores unknown feature names, so passing the flag alone is not proof).`);
+              if (webmcp.insecureHttpOrigin) {
+                lines.push(`- ⚠️ This page's origin (\`${webmcp.origin}\`) is http non-localhost, which is not a secure context. Chromium withholds \`document.modelContext\` on insecure contexts regardless of \`--enable-features=WebMCP\`. Add \`--unsafely-treat-insecure-origin-as-secure=${webmcp.origin}\` to \`browser_configure\` args for this origin, or use HTTPS, or use localhost.`);
+              } else {
+                lines.push(`- ⚠️ Chrome version supports WebMCP but feature not enabled. Pass \`--enable-features=WebMCP\` via \`browser_configure\` args (Chromium silently ignores unknown feature names, so passing the flag alone is not proof).`);
+              }
             }
           }
         } catch {

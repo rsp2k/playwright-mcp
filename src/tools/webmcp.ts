@@ -147,10 +147,38 @@ const call = defineTabTool({
         // Not JSON, keep as-is.
       }
     }
-    response.addResult(
-        `✅ **${params.name}** returned:\n\n` +
-      '```json\n' + JSON.stringify(parsed, null, 2) + '\n```'
-    );
+
+    // Honesty about error results: MCP ToolResult carries isError:true for
+    // invocation-level failures (e.g. validation rejection, guard trip).
+    // A ✅ header on an error result is misleading — peer caught this when
+    // get_listing("../admin") returned isError with our guard text and the
+    // tool still printed ✅ returned.
+    const isObj = parsed && typeof parsed === 'object';
+    const isError = isObj && parsed.isError === true;
+    const header = isError
+      ? `⚠️ **${params.name}** returned an error result (\`isError: true\`):`
+      : `✅ **${params.name}** returned:`;
+
+    // When structuredContent is present, content[].text typically duplicates
+    // it as a JSON string — showing both doubles the output. Prefer the
+    // structured form, fall back to the raw/content shape when it is absent.
+    // For error results we also surface the content text since tools usually
+    // put the human-readable error message there, not in structuredContent.
+    let body: string;
+    const hasStructured = isObj && parsed.structuredContent !== undefined;
+    const errText = isError && Array.isArray(parsed.content)
+      ? parsed.content.map((c: any) => c?.text ?? '').filter(Boolean).join('\n')
+      : '';
+    if (hasStructured && errText)
+      body = `${errText}\n\n\`\`\`json\n${JSON.stringify(parsed.structuredContent, null, 2)}\n\`\`\``;
+    else if (hasStructured)
+      body = '```json\n' + JSON.stringify(parsed.structuredContent, null, 2) + '\n```';
+    else if (errText)
+      body = errText;
+    else
+      body = '```json\n' + JSON.stringify(parsed, null, 2) + '\n```';
+
+    response.addResult(`${header}\n\n${body}`);
   },
 });
 
@@ -180,6 +208,11 @@ const watch = defineTabTool({
           type,
           timestamp: Date.now(),
           toolName: e.toolName ?? null,
+          // isTrusted is true for events the user agent dispatched (real
+          // tool invocations) and false if page script synthesized the event
+          // itself. It is the specific property that proves the tool call
+          // wasn't faked by overlay markup.
+          isTrusted: typeof e.isTrusted === 'boolean' ? e.isTrusted : null,
         });
       };
       mc.addEventListener('toolactivated', push('toolactivated'));
@@ -232,7 +265,8 @@ const events = defineTabTool({
     const lines: string[] = [`${result.events.length} event(s)${params.clear ? ' (buffer cleared)' : ''}:`, ''];
     result.events.forEach((e: any, i: number) => {
       const t = new Date(e.timestamp).toISOString().split('T')[1].replace('Z', '');
-      lines.push(`${i + 1}. [${t}] \`${e.type}\`${e.toolName ? ` → **${e.toolName}**` : ''}`);
+      const trust = e.isTrusted === true ? ' ✓trusted' : e.isTrusted === false ? ' ✗synthetic' : '';
+      lines.push(`${i + 1}. [${t}] \`${e.type}\`${e.toolName ? ` → **${e.toolName}**` : ''}${trust}`);
     });
     response.addResult(lines.join('\n'));
   },
