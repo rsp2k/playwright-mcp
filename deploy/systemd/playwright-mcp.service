@@ -1,0 +1,34 @@
+[Unit]
+Description=playwright-mcp dockerized HTTP MCP server
+# User service: can't cleanly require a system service like docker.service,
+# but we want docker to be fully ready by the time compose runs. Waiting
+# on network-online is a reasonable proxy since docker needs a functional
+# bridge network to start containers.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# oneshot: compose up -d returns promptly after dispatching the container;
+# the actual container lifecycle is managed by docker's restart policy
+# (unless-stopped in docker-compose.yml). RemainAfterExit keeps this unit
+# marked active so systemctl status reflects the stack's intent, not just
+# the brief up-d invocation.
+Type=oneshot
+RemainAfterExit=yes
+
+# Absolute paths to the project. If you move the checkout, update this
+# and run `systemctl --user daemon-reload`.
+WorkingDirectory=%h/claude/playwright-mcp
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose stop
+
+# Modest retry on failure: docker occasionally takes a moment after boot
+# to become responsive. Three tries over ~30s covers that without
+# masking real problems.
+Restart=on-failure
+RestartSec=10s
+StartLimitBurst=3
+StartLimitIntervalSec=60s
+
+[Install]
+WantedBy=default.target

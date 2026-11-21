@@ -54,6 +54,15 @@ services:
       caddy: ${DOMAIN}
       caddy.reverse_proxy: "{{upstreams 8931}}"
 
+    # Resolve host.docker.internal to the Docker host's IP from the
+    # container's perspective. Needed when an agent wants the browser to
+    # reach a dev server running directly on the host (e.g. an Astro dev
+    # server bound to localhost:4470) rather than a sibling container.
+    # host-gateway is a Docker-reserved alias that resolves to the correct
+    # bridge IP regardless of which network the container is on.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
     networks:
       - caddy
 

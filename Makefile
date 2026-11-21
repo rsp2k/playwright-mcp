@@ -1,4 +1,4 @@
-.PHONY: up down restart logs status build rebuild shell health smoke
+.PHONY: up down restart logs status build rebuild shell health smoke install-systemd uninstall-systemd
 
 # Default target: show what's available.
 help:
@@ -14,6 +14,9 @@ help:
 	@echo "  make shell    — interactive shell inside the running container"
 	@echo "  make smoke    — curl the /mcp endpoint via caddy to confirm end-to-end"
 	@echo "  make rebuild  — rebuild image from scratch (no cache)"
+	@echo ""
+	@echo "  make install-systemd    — install user systemd unit so the stack starts at login/boot"
+	@echo "  make uninstall-systemd  — stop, disable, and remove the user systemd unit"
 
 build:
 	docker compose build
@@ -51,3 +54,22 @@ smoke:
 
 rebuild:
 	docker compose build --no-cache
+
+install-systemd:
+	@install -D deploy/systemd/playwright-mcp.service "$$HOME/.config/systemd/user/playwright-mcp.service"
+	@systemctl --user daemon-reload
+	@systemctl --user enable --now playwright-mcp.service
+	@echo ""
+	@echo "User unit installed and enabled."
+	@echo "  Status:  systemctl --user status playwright-mcp"
+	@echo "  Logs:    journalctl --user -u playwright-mcp -f"
+	@echo ""
+	@echo "For the stack to start at boot WITHOUT requiring an interactive login,"
+	@echo "run once (needs sudo):"
+	@echo "  sudo loginctl enable-linger $$USER"
+
+uninstall-systemd:
+	@systemctl --user disable --now playwright-mcp.service 2>/dev/null || true
+	@rm -f "$$HOME/.config/systemd/user/playwright-mcp.service"
+	@systemctl --user daemon-reload
+	@echo "User unit disabled and removed. (loginctl linger left untouched.)"
