@@ -35,6 +35,12 @@ program
     .option('--blocked-origins <origins>', 'semicolon-separated list of origins to block the browser from requesting. Blocklist is evaluated before allowlist. If used without the allowlist, requests not matching the blocklist are still allowed.', semicolonSeparatedList)
     .option('--block-service-workers', 'block service workers')
     .option('--browser <browser>', 'browser or chrome channel to use, possible values: chrome, firefox, webkit, msedge.')
+    .option(
+        '--browser-arg <arg>',
+        'additional argument to pass through to the browser process on launch. Repeatable (use once per argument). Example: --browser-arg=--class=MyWindowClass --browser-arg=--force-color-profile=srgb',
+        (val, acc: string[]) => [...acc, val],
+        [] as string[]
+    )
     .option('--caps <caps>', 'comma-separated list of additional capabilities to enable, possible values: vision, pdf.', commaSeparatedList)
     .option('--cdp-endpoint <endpoint>', 'CDP endpoint to connect to.')
     .option('--config <path>', 'path to the configuration file.')

@@ -44,6 +44,11 @@ services:
       # entrypoint; we drop its entrypoint for dev-mode flexibility, so
       # we have to supply it here.
       - --no-sandbox
+      # Give chromium a distinctive WM_CLASS so host-side window-manager
+      # rules can target the container's windows precisely (e.g. refuse
+      # focus-stealing) without affecting the user's regular browser.
+      # Verify from the host with: wmctrl -lx | grep PlaywrightMCPContainer
+      - --browser-arg=--class=PlaywrightMCPContainer
 
     labels:
       caddy: ${DOMAIN}

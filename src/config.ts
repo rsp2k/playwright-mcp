@@ -28,6 +28,7 @@ export type CLIOptions = {
   blockedOrigins?: string[];
   blockServiceWorkers?: boolean;
   browser?: string;
+  browserArgs?: string[];
   caps?: string[];
   cdpEndpoint?: string;
   config?: string;
@@ -160,6 +161,12 @@ export function configFromCLIOptions(cliOptions: CLIOptions): Config {
   if (cliOptions.sandbox === false)
     launchOptions.chromiumSandbox = false;
 
+  // --browser-arg repeated: raw chromium args appended as-is. Useful for
+  // flags that playwright-mcp doesn't model (e.g. --class=<WM_CLASS> for
+  // host-side window-manager rules, --force-color-profile=srgb, etc.)
+  if (cliOptions.browserArgs && cliOptions.browserArgs.length > 0)
+    launchOptions.args = [...(launchOptions.args ?? []), ...cliOptions.browserArgs];
+
   if (cliOptions.proxyServer) {
     launchOptions.proxy = {
       server: cliOptions.proxyServer
@@ -255,6 +262,9 @@ function configFromEnv(): Config {
   options.blockedOrigins = semicolonSeparatedList(process.env.PLAYWRIGHT_MCP_BLOCKED_ORIGINS);
   options.blockServiceWorkers = envToBoolean(process.env.PLAYWRIGHT_MCP_BLOCK_SERVICE_WORKERS);
   options.browser = envToString(process.env.PLAYWRIGHT_MCP_BROWSER);
+  // Semicolon separator (not comma) because chromium args themselves often
+  // contain commas, e.g. --disable-features=A,B. Semicolon is safe.
+  options.browserArgs = semicolonSeparatedList(process.env.PLAYWRIGHT_MCP_BROWSER_ARGS);
   options.caps = commaSeparatedList(process.env.PLAYWRIGHT_MCP_CAPS);
   options.cdpEndpoint = envToString(process.env.PLAYWRIGHT_MCP_CDP_ENDPOINT);
   options.config = envToString(process.env.PLAYWRIGHT_MCP_CONFIG);
