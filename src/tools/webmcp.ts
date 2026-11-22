@@ -247,11 +247,18 @@ const call = defineTabTool({
     else
       body = '```json\n' + JSON.stringify(parsed, null, 2) + '\n```';
 
-    // Soft budget lint on output. Measures the rendered body since that's
-    // what actually enters the agent's context, not the raw executeTool
-    // return. Chrome's guidance is 1500 chars/tool-output.
-    const budgetNote = body.length > BUDGET.output
-      ? `\n\n📏 Output ${body.length} chars exceeds Chrome's ${BUDGET.output}-char guidance for individual tool output.`
+    // Soft budget lint on output. Measures the raw executeTool return
+    // string (what Chrome hands the agent, which is compact JSON per the
+    // WebMCP spec), NOT our pretty-printed display body. Peer caught that
+    // JSON.stringify(v, null, 2) inflates by ~1.3x via indentation and
+    // newlines, so a pretty-measured lint false-positives on tools whose
+    // actual agent-facing output is within budget. Chrome's 1500-char
+    // guidance counts agent-facing bytes.
+    const measured = typeof result.raw === 'string'
+      ? result.raw.length
+      : JSON.stringify(parsed ?? '').length;
+    const budgetNote = measured > BUDGET.output
+      ? `\n\n📏 Agent-facing output ${measured} chars exceeds Chrome's ${BUDGET.output}-char guidance for individual tool output.`
       : '';
 
     response.addResult(`${header}\n\n${body}${budgetNote}`);
