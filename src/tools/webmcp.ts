@@ -41,33 +41,56 @@ const SHAPE = {
   missing: 'document.modelContext not available. Check browser_status for Chrome version and WebMCP capability.',
 };
 
-const listSchema = z.object({});
+// Character budgets from Chrome's "secure tools / guardrail avoidance" guidance
+// (developer.chrome.com/docs/ai/webmcp/secure-tools). Exceeding these does not
+// block invocation but lets an agent exhaust prompt context, trip rate limits,
+// or paper over oversized fields that upstream clients will truncate silently.
+// We render soft warnings so agents and tool authors know.
+const BUDGET = {
+  toolName: 30,
+  toolDescription: 500,
+  paramName: 30,
+  paramDescription: 150,
+  output: 1500,
+} as const;
+
+const listSchema = z.object({
+  fromOrigins: z.array(z.string()).optional().describe('Also include tools registered by pages at these cross-origins. Default is same-origin only. Both the current origin and listed origins must be secure (HTTPS or localhost); listed origins must have called registerTool with { exposedTo: [<current-origin>] } to opt in.'),
+});
 
 const list = defineTabTool({
   capability: 'core',
   schema: {
     name: 'browser_webmcp_list',
     title: 'List WebMCP tools exposed by the current page',
-    description: 'Returns the tools the current page has registered via document.modelContext.registerTool. Reads page-side to preserve annotations (Playwright\'s wrapper drops them). Requires Chromium 146+ with WebMCP enabled; use browser_status to verify capability.',
+    description: 'Returns the tools the current page has registered via document.modelContext.registerTool (imperative) or declared as a tool-annotated HTML form (declarative). Both appear here; declarative tools surface via the same getTools() call. Reads page-side to preserve annotations (Playwright\'s wrapper drops them). Flags consequentialHint tools prominently since those indicate irreversible actions. Soft-warns on tools that exceed Chrome\'s secure-tools character budgets. Requires Chromium 146+ with WebMCP enabled; use browser_status to verify capability.',
     inputSchema: listSchema,
     type: 'readOnly',
   },
-  handle: async (tab, _params, response) => {
-    const result = await tab.page.evaluate(async () => {
+  handle: async (tab, params, response) => {
+    const result = await tab.page.evaluate(async (fromOrigins: string[] | undefined) => {
       const mc = (document as any).modelContext;
       if (!mc || typeof mc.getTools !== 'function')
         return { available: false };
-      const tools = await mc.getTools();
+      // getTools({ fromOrigins }) adds cross-origin tools; omit the option
+      // to preserve the default same-origin-only behavior. Secure-origin
+      // only on both sides, enforced by Chromium itself.
+      const tools = fromOrigins && fromOrigins.length > 0
+        ? await mc.getTools({ fromOrigins })
+        : await mc.getTools();
       return {
         available: true,
         tools: tools.map((t: any) => ({
           name: t.name,
           description: t.description ?? null,
           inputSchema: t.inputSchema ?? null,
+          // outputSchema is an optional registration field added in Chrome 159.
+          // Surface when present so an agent knows the expected shape.
+          outputSchema: t.outputSchema ?? null,
           annotations: t.annotations ?? null,
         })),
       };
-    });
+    }, params.fromOrigins);
 
     if (!result.available) {
       response.addResult(`⚠️ ${SHAPE.missing}`);
@@ -81,13 +104,47 @@ const list = defineTabTool({
 
     const lines: string[] = [`Found **${result.tools.length}** WebMCP tool(s) on this page:`, ''];
     result.tools.forEach((t: any, i: number) => {
-      const readOnly = t.annotations?.readOnlyHint ? ' _(read-only)_' : '';
-      const untrusted = t.annotations?.untrustedContentHint ? ' _(untrusted-content)_' : '';
-      lines.push(`${i + 1}. **${t.name}**${readOnly}${untrusted}`);
+      // Four annotations Chrome recognizes (readOnlyHint, untrustedContentHint,
+      // consequentialHint, debugging). consequentialHint renders loudly since
+      // it signals irreversible actions the agent may want to confirm first.
+      const tags: string[] = [];
+      if (t.annotations?.consequentialHint)
+        tags.push('⚠️ CONSEQUENTIAL');
+      if (t.annotations?.readOnlyHint)
+        tags.push('read-only');
+      if (t.annotations?.untrustedContentHint)
+        tags.push('untrusted-content');
+      if (t.annotations?.debugging)
+        tags.push('debugging');
+      const tagStr = tags.length ? ` _(${tags.join(', ')})_` : '';
+      lines.push(`${i + 1}. **${t.name}**${tagStr}`);
+
       if (t.description)
         lines.push(`   ${t.description}`);
       if (t.inputSchema)
         lines.push(`   Input schema: \`${JSON.stringify(t.inputSchema)}\``);
+      if (t.outputSchema)
+        lines.push(`   Output schema: \`${JSON.stringify(t.outputSchema)}\``);
+
+      // Soft budget lint. Does not block anything, just flags for authors.
+      const warns: string[] = [];
+      if (typeof t.name === 'string' && t.name.length > BUDGET.toolName)
+        warns.push(`name ${t.name.length}>${BUDGET.toolName}`);
+      if (typeof t.description === 'string' && t.description.length > BUDGET.toolDescription)
+        warns.push(`description ${t.description.length}>${BUDGET.toolDescription}`);
+      const props = t.inputSchema && t.inputSchema.properties;
+      if (props && typeof props === 'object') {
+        for (const [pname, pdef] of Object.entries(props)) {
+          if (pname.length > BUDGET.paramName)
+            warns.push(`param "${pname}" name ${pname.length}>${BUDGET.paramName}`);
+          const pdesc = (pdef as any)?.description;
+          if (typeof pdesc === 'string' && pdesc.length > BUDGET.paramDescription)
+            warns.push(`param "${pname}" description ${pdesc.length}>${BUDGET.paramDescription}`);
+        }
+      }
+      if (warns.length)
+        lines.push(`   📏 Budget lint: ${warns.join('; ')}`);
+
       lines.push('');
     });
     lines.push('Invoke with `browser_webmcp_call`.');
@@ -138,6 +195,18 @@ const call = defineTabTool({
       return;
     }
 
+    // executeTool resolves to null when the tool triggered a navigation,
+    // per the WebMCP spec. Distinct from an empty result — this tells the
+    // agent "I went somewhere" so a follow-up status/evaluate makes sense
+    // rather than retrying the same call expecting data.
+    if (result.raw === null) {
+      response.addResult(
+          `🧭 **${params.name}** triggered a navigation. executeTool resolved to null, per the WebMCP spec, which means the tool navigated the page. ` +
+        `Check \`browser_status\` for the new URL and re-run \`browser_webmcp_list\` since the page's tool set may have changed.`
+      );
+      return;
+    }
+
     // raw is typically a JSON string per the WebMCP spec; parse for display.
     let parsed: any = result.raw;
     if (typeof result.raw === 'string') {
@@ -178,7 +247,14 @@ const call = defineTabTool({
     else
       body = '```json\n' + JSON.stringify(parsed, null, 2) + '\n```';
 
-    response.addResult(`${header}\n\n${body}`);
+    // Soft budget lint on output. Measures the rendered body since that's
+    // what actually enters the agent's context, not the raw executeTool
+    // return. Chrome's guidance is 1500 chars/tool-output.
+    const budgetNote = body.length > BUDGET.output
+      ? `\n\n📏 Output ${body.length} chars exceeds Chrome's ${BUDGET.output}-char guidance for individual tool output.`
+      : '';
+
+    response.addResult(`${header}\n\n${body}${budgetNote}`);
   },
 });
 
@@ -233,7 +309,7 @@ const watch = defineTabTool({
     }
     response.addResult(result.already
       ? `Already watching. ${result.bufferedCount} event(s) buffered — drain with browser_webmcp_events.`
-      : '✅ Watching toolactivated and toolchange. Drain with browser_webmcp_events.');
+      : '✅ Watching toolactivated, toolchange, and toolcancel. Drain with browser_webmcp_events.');
   },
 });
 
