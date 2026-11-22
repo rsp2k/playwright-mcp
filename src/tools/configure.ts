@@ -15,6 +15,8 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
@@ -38,6 +40,38 @@ const BUILD_FINGERPRINT = (() => {
   } catch {
     return { compiledPath: 'unknown', mtime: 'unknown' };
   }
+})();
+
+// Find the newest locally-cached chromium binary to recommend in the
+// WebMCP "upgrade your Chrome" hint. Previously hardcoded to a path
+// that only existed inside the docker container (/ms-playwright-host/...),
+// misleading users running the stdio server directly on the host.
+// Honors PLAYWRIGHT_BROWSERS_PATH (which the container sets to
+// /ms-playwright-host) and falls back to ~/.cache/ms-playwright on the host.
+// Scans at module load rather than per-call since the cache does not change
+// during a server's lifetime.
+const RECOMMENDED_CHROMIUM: { path: string; rev: string | null } = (() => {
+  const browsersDir = process.env.PLAYWRIGHT_BROWSERS_PATH
+      || path.join(os.homedir(), '.cache', 'ms-playwright');
+  try {
+    const chromiums = fs.readdirSync(browsersDir)
+        .filter(e => /^chromium-\d+$/.test(e))
+        .sort((a, b) => parseInt(b.split('-')[1], 10) - parseInt(a.split('-')[1], 10));
+    for (const dir of chromiums) {
+      // Newer chromium downloads use chrome-linux64/; older ones used chrome-linux/.
+      for (const subdir of ['chrome-linux64', 'chrome-linux']) {
+        const bin = path.join(browsersDir, dir, subdir, 'chrome');
+        if (fs.existsSync(bin))
+          return { path: bin, rev: dir.replace('chromium-', '') };
+      }
+    }
+  } catch {
+    // Browsers cache missing or unreadable — fall through to placeholder.
+  }
+  return {
+    path: path.join(browsersDir, 'chromium-NNNN', 'chrome-linux64', 'chrome'),
+    rev: null,
+  };
 })();
 
 const configureSchema = z.object({
@@ -1184,7 +1218,10 @@ export default [
           );
           if (!webmcp.modelContextPresent) {
             if (webmcp.chromeMajor && webmcp.chromeMajor < 146) {
-              lines.push(`- ⚠️ Chrome ${webmcp.chromeMajor} predates WebMCP (needs 146+, ideally 153+). Use \`browser_configure\` with \`executablePath\` pointing at a newer chromium, e.g. \`/ms-playwright-host/chromium-1248/chrome-linux64/chrome\` (Chrome 156).`);
+              const suffix = RECOMMENDED_CHROMIUM.rev
+                ? ` (revision ${RECOMMENDED_CHROMIUM.rev}, from this host's playwright cache)`
+                : ` (no newer chromium found in \`${RECOMMENDED_CHROMIUM.path.replace(/\/chromium-NNNN.*$/, '')}\`; install one with \`npx playwright install chrome\`)`;
+              lines.push(`- ⚠️ Chrome ${webmcp.chromeMajor} predates WebMCP (needs 146+, ideally 153+). Use \`browser_configure\` with \`executablePath\` pointing at a newer chromium, e.g. \`${RECOMMENDED_CHROMIUM.path}\`${suffix}.`);
             } else if (webmcp.chromeMajor && webmcp.chromeMajor >= 146) {
               if (webmcp.insecureHttpOrigin) {
                 lines.push(`- ⚠️ This page's origin (\`${webmcp.origin}\`) is http non-localhost, which is not a secure context. Chromium withholds \`document.modelContext\` on insecure contexts regardless of \`--enable-features=WebMCP\`. Add \`--unsafely-treat-insecure-origin-as-secure=${webmcp.origin}\` to \`browser_configure\` args for this origin, or use HTTPS, or use localhost.`);

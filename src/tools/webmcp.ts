@@ -189,7 +189,7 @@ const watch = defineTabTool({
   schema: {
     name: 'browser_webmcp_watch',
     title: 'Start watching WebMCP toolchange and toolactivated events',
-    description: 'Installs a listener on document.modelContext that buffers toolchange (tools registered/unregistered) and toolactivated (tool invoked) events to window.__webmcpEvents. Idempotent — calling twice does not install twice. Drain the buffer with browser_webmcp_events. Makes WebMCP demos self-evidencing by proving tool calls really happened.',
+    description: 'Installs a listener on document.modelContext that buffers toolchange (tools registered/unregistered), toolactivated (tool invoked), and toolcancel (invocation cancelled mid-flight) events to window.__webmcpEvents. Covers all three events Chrome 156 exposes via ontoolchange/ontoolactivated/ontoolcancel. Idempotent — calling twice does not install twice. Drain the buffer with browser_webmcp_events. Makes WebMCP demos self-evidencing by proving tool calls really happened.',
     inputSchema: watchSchema,
     type: 'destructive',
   },
@@ -217,6 +217,13 @@ const watch = defineTabTool({
       };
       mc.addEventListener('toolactivated', push('toolactivated'));
       mc.addEventListener('toolchange', push('toolchange'));
+      // toolcancel fires when an executeTool invocation is cancelled
+      // mid-flight (user-aborted, page-aborted, or UA-aborted). Discovered
+      // via prototype inspection: Chrome 156's ModelContext exposes
+      // ontoolchange, ontoolactivated, and ontoolcancel as IDL accessors,
+      // which is the authoritative signal for which events it fires.
+      // The DevTools WebMCP pane also surfaces "Canceled" as a status.
+      mc.addEventListener('toolcancel', push('toolcancel'));
       return { ok: true, already: false };
     });
 
